@@ -1,0 +1,47 @@
+[project]
+name = "weather-aware-truck-routing"
+version = "0.1.0"
+description = "Weather-aware truck routing API"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "django>=5.2,<5.3",
+    "django-cors-headers>=4.9.0",
+    "djangorestframework>=3.18.3",
+    "gunicorn>=26.2.0",
+    "redis>=5",
+]
+
+[dependency-groups]
+dev = [
+    "django-stubs>=6.1.2",
+    "djangorestframework-stubs>=3.18.1",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "pytest-django>=4.14.0",
+    "ruff>=0.17.3",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DJ"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+exclude = ["\\.venv"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[tool.coverage.run]
+source = ["config", "routing"]

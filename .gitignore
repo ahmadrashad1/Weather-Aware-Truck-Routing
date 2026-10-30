@@ -1,0 +1,36 @@
+# Local-only assessment and agent tooling
+fs-assessment-spotter.pdf
+.agents/
+.claude/skills/
+.claude/settings.local.json
+.superpowers/
+skills-lock.json
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
