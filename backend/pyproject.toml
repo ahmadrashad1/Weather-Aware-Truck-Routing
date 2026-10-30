@@ -8,6 +8,7 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.18.3",
     "gunicorn>=26.2.0",
+    "httpx>=0.28",
     "redis>=5",
 ]
 
@@ -20,6 +21,7 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-django>=4.14.0",
     "pytest-env>=1.8.3",
+    "respx>=0.22",
     "ruff>=0.17.3",
 ]
 
