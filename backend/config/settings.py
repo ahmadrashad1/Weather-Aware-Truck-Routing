@@ -67,7 +67,11 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "routing.api.errors.exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # These protect the provider quotas, which are shared by every user of the app.
-    "DEFAULT_THROTTLE_RATES": {"trip_plan": "30/hour", "geocode": "120/minute"},
+    "DEFAULT_THROTTLE_RATES": {
+        "trip_plan": "30/hour",
+        "heatmap": "30/hour",
+        "geocode": "120/minute",
+    },
 }
 
 SPECTACULAR_SETTINGS = {

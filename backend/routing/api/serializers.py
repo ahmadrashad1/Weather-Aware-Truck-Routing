@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from routing.domain import RiskLevel
 from routing.services.geometry import LatLon, haversine_miles
+from routing.services.heatmap import HEATMAP_FRAMES, Heatmap
 from routing.services.route_scorer import AssessedCheckpoint
 from routing.services.trip_planner import PlannedRoute, TripPlan
 
@@ -17,6 +18,8 @@ DEPARTURE_GRACE = timedelta(minutes=15)
 # The forecast covers 16 days, and this leaves room for the trip and the 48-hour heatmap.
 DEPARTURE_HORIZON = timedelta(days=14)
 MIN_TRIP_MILES = 0.1
+MAX_HEATMAP_ROUTES = 3
+MAX_ROUTE_POINTS = 20_000
 
 RISK_CODES = ["low", "moderate", "high", "severe", "no_travel"]
 RISK_OR_UNKNOWN_CODES = [*RISK_CODES, "unknown"]
@@ -54,20 +57,20 @@ class LocationSerializer(serializers.Serializer[Any]):
     lon = FiniteFloatField(min_value=-180, max_value=180)
 
 
+def validate_departure_window(value: datetime) -> None:
+    now = timezone.now()
+    if value < now - DEPARTURE_GRACE:
+        raise serializers.ValidationError("Departure cannot be in the past.")
+    if value > now + DEPARTURE_HORIZON:
+        raise serializers.ValidationError("Departure must be within the next 14 days.")
+
+
 class PlanRequestSerializer(serializers.Serializer[Any]):
     origin = LocationSerializer()
     destination = LocationSerializer()
-    departure_at = OffsetDateTimeField()
+    departure_at = OffsetDateTimeField(validators=[validate_departure_window])
     load_lb = FiniteFloatField(min_value=0, max_value=MAX_LOAD_LB)
     interval_miles = serializers.ChoiceField(choices=INTERVALS_MILES)
-
-    def validate_departure_at(self, value: datetime) -> datetime:
-        now = timezone.now()
-        if value < now - DEPARTURE_GRACE:
-            raise serializers.ValidationError("Departure cannot be in the past.")
-        if value > now + DEPARTURE_HORIZON:
-            raise serializers.ValidationError("Departure must be within the next 14 days.")
-        return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         origin = (attrs["origin"]["lat"], attrs["origin"]["lon"])
@@ -77,6 +80,51 @@ class PlanRequestSerializer(serializers.Serializer[Any]):
                 {"destination": ["Destination must be different from the origin."]}
             )
         return attrs
+
+
+@extend_schema_field(
+    {
+        "type": "array",
+        "description": "A route line as [longitude, latitude] pairs, as GeoJSON orders them.",
+        "items": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+        "minItems": 2,
+        "maxItems": MAX_ROUTE_POINTS,
+    }
+)
+class RouteLineField(serializers.Field[list[LatLon], list[list[float]], Any, Any]):
+    """Accept a GeoJSON-ordered line and turn it into (latitude, longitude) points."""
+
+    default_error_messages = {
+        "invalid": f"Send 2 to {MAX_ROUTE_POINTS} [longitude, latitude] pairs in range.",
+    }
+
+    def to_internal_value(self, data: Any) -> list[LatLon]:
+        if not isinstance(data, list) or not 2 <= len(data) <= MAX_ROUTE_POINTS:
+            self.fail("invalid")
+        return [self._point(item) for item in data]
+
+    def _point(self, item: Any) -> LatLon:
+        if not isinstance(item, list) or len(item) != 2:
+            self.fail("invalid")
+        lon, lat = item
+        for value in (lon, lat):
+            # A bool counts as an int in Python, and a string such as "nan" must not pass.
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                self.fail("invalid")
+        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+            self.fail("invalid")
+        return (float(lat), float(lon))
+
+    def to_representation(self, value: list[LatLon]) -> list[list[float]]:
+        return [[lon, lat] for lat, lon in value]
+
+
+class HeatmapRequestSerializer(serializers.Serializer[Any]):
+    routes = serializers.ListField(
+        child=RouteLineField(), min_length=1, max_length=MAX_HEATMAP_ROUTES
+    )
+    departure_at = OffsetDateTimeField(validators=[validate_departure_window])
+    load_lb = FiniteFloatField(min_value=0, max_value=MAX_LOAD_LB)
 
 
 class GeocodeQuerySerializer(serializers.Serializer[Any]):
@@ -161,11 +209,42 @@ class RouteSerializer(serializers.Serializer[Any]):
     checkpoints = CheckpointSerializer(many=True)
 
 
+@extend_schema_field(
+    {
+        "type": "array",
+        "description": (
+            "One list per point, holding the risk level at each hour from departure: "
+            "0 Low, 1 Moderate, 2 High, 3 Severe, 4 No Travel, "
+            "or null where weather is unavailable."
+        ),
+        "items": {"type": "array", "items": {"type": "integer", "nullable": True}},
+    }
+)
+class RiskFramesField(serializers.JSONField):
+    """Pass prepared frames through, as a nested field per value is slow at 300 x 49."""
+
+
+class HeatmapResponseSerializer(serializers.Serializer[Any]):
+    departure_at = serializers.DateTimeField()
+    hours = serializers.IntegerField()
+    points = CoordinatesField()
+    risk = RiskFramesField()
+
+
 class PlanResponseSerializer(serializers.Serializer[Any]):
     recommended_route_id = serializers.CharField(allow_null=True)
     no_safe_route = serializers.BooleanField()
     warnings = serializers.ListField(child=serializers.CharField())
     routes = RouteSerializer(many=True)
+
+
+def heatmap_to_response(heatmap: Heatmap) -> dict[str, Any]:
+    return {
+        "departure_at": heatmap.departure_at,
+        "hours": HEATMAP_FRAMES,
+        "points": _coordinates(heatmap.points),
+        "risk": [list(frames) for frames in heatmap.risk],
+    }
 
 
 def plan_to_response(plan: TripPlan) -> dict[str, Any]:
