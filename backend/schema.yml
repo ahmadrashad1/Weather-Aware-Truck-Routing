@@ -40,6 +40,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: ''
+  /api/v1/trips/heatmap:
+    post:
+      operationId: trips_heatmap_create
+      tags:
+      - trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeatmapRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeatmapResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
   /api/v1/trips/plan:
     post:
       operationId: trips_plan_create
@@ -167,6 +203,69 @@ components:
             $ref: '#/components/schemas/Location'
       required:
       - results
+    HeatmapRequest:
+      type: object
+      properties:
+        routes:
+          type: array
+          items:
+            type: array
+            description: A route line as [longitude, latitude] pairs, as GeoJSON orders
+              them.
+            items:
+              type: array
+              items:
+                type: number
+              minItems: 2
+              maxItems: 2
+            minItems: 2
+            maxItems: 20000
+          maxItems: 3
+          minItems: 1
+        departure_at:
+          type: string
+          format: date-time
+        load_lb:
+          type: number
+          format: double
+          maximum: 80000
+          minimum: 0
+      required:
+      - departure_at
+      - load_lb
+      - routes
+    HeatmapResponse:
+      type: object
+      properties:
+        departure_at:
+          type: string
+          format: date-time
+        hours:
+          type: integer
+        points:
+          type: array
+          description: '[longitude, latitude] pairs, as GeoJSON orders them.'
+          items:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+        risk:
+          type: array
+          description: 'One list per point, holding the risk level at each hour from
+            departure: 0 Low, 1 Moderate, 2 High, 3 Severe, 4 No Travel, or null where
+            weather is unavailable.'
+          items:
+            type: array
+            items:
+              type: integer
+              nullable: true
+      required:
+      - departure_at
+      - hours
+      - points
+      - risk
     IntervalMilesEnum:
       enum:
       - 10

@@ -1,8 +1,9 @@
 from django.urls import path
 
-from routing.api.views import GeocodeView, PlanTripView
+from routing.api.views import GeocodeView, HeatmapView, PlanTripView
 
 urlpatterns = [
     path("geocode", GeocodeView.as_view()),
     path("trips/plan", PlanTripView.as_view()),
+    path("trips/heatmap", HeatmapView.as_view()),
 ]
