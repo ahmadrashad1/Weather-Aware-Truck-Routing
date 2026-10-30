@@ -1,5 +1,5 @@
 from django.http import HttpRequest, JsonResponse
-from django.urls import path
+from django.urls import include, path
 
 
 def health(request: HttpRequest) -> JsonResponse:
@@ -8,4 +8,5 @@ def health(request: HttpRequest) -> JsonResponse:
 
 urlpatterns = [
     path("api/v1/health", health),
+    path("api/v1/", include("routing.api.urls")),
 ]

@@ -1,0 +1,412 @@
+openapi: 3.0.3
+info:
+  title: Weather-Aware Truck Routing API
+  version: 1.0.0
+paths:
+  /api/v1/geocode:
+    get:
+      operationId: geocode_retrieve
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Search text
+        required: true
+      tags:
+      - geocode
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeocodeResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /api/v1/trips/plan:
+    post:
+      operationId: trips_plan_create
+      tags:
+      - trips
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+components:
+  schemas:
+    Checkpoint:
+      type: object
+      properties:
+        id:
+          type: string
+        mile:
+          type: number
+          format: double
+        lat:
+          type: number
+          format: double
+        lon:
+          type: number
+          format: double
+        eta:
+          type: string
+          format: date-time
+        represented_miles:
+          type: number
+          format: double
+        weather:
+          allOf:
+          - $ref: '#/components/schemas/Weather'
+          nullable: true
+        risk:
+          $ref: '#/components/schemas/RiskOrUnknownEnum'
+        wind_risk:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/RiskEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        rain_risk:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/RiskEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        snow_risk:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/RiskEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        load_adjusted:
+          type: boolean
+        drivers:
+          type: array
+          items:
+            type: string
+      required:
+      - drivers
+      - eta
+      - id
+      - lat
+      - load_adjusted
+      - lon
+      - mile
+      - rain_risk
+      - represented_miles
+      - risk
+      - snow_risk
+      - weather
+      - wind_risk
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+      required:
+      - code
+      - message
+    GeocodeResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Location'
+      required:
+      - results
+    IntervalMilesEnum:
+      enum:
+      - 10
+      - 25
+      - 50
+      type: integer
+      description: |-
+        * `10` - 10
+        * `25` - 25
+        * `50` - 50
+    LineString:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/TypeEnum'
+        coordinates:
+          type: array
+          description: '[longitude, latitude] pairs, as GeoJSON orders them.'
+          items:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+      required:
+      - coordinates
+      - type
+    Location:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 200
+        lat:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+        lon:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+      required:
+      - label
+      - lat
+      - lon
+    NullEnum:
+      enum:
+      - null
+    PlanRequest:
+      type: object
+      properties:
+        origin:
+          $ref: '#/components/schemas/Location'
+        destination:
+          $ref: '#/components/schemas/Location'
+        departure_at:
+          type: string
+          format: date-time
+        load_lb:
+          type: number
+          format: double
+          maximum: 80000
+          minimum: 0
+        interval_miles:
+          $ref: '#/components/schemas/IntervalMilesEnum'
+      required:
+      - departure_at
+      - destination
+      - interval_miles
+      - load_lb
+      - origin
+    PlanResponse:
+      type: object
+      properties:
+        recommended_route_id:
+          type: string
+          nullable: true
+        no_safe_route:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Route'
+      required:
+      - no_safe_route
+      - recommended_route_id
+      - routes
+      - warnings
+    RiskEnum:
+      enum:
+      - low
+      - moderate
+      - high
+      - severe
+      - no_travel
+      type: string
+      description: |-
+        * `low` - low
+        * `moderate` - moderate
+        * `high` - high
+        * `severe` - severe
+        * `no_travel` - no_travel
+    RiskOrUnknownEnum:
+      enum:
+      - low
+      - moderate
+      - high
+      - severe
+      - no_travel
+      - unknown
+      type: string
+      description: |-
+        * `low` - low
+        * `moderate` - moderate
+        * `high` - high
+        * `severe` - severe
+        * `no_travel` - no_travel
+        * `unknown` - unknown
+    Route:
+      type: object
+      properties:
+        id:
+          type: string
+        rank:
+          type: integer
+        rationale:
+          type: string
+        summary:
+          $ref: '#/components/schemas/RouteSummary'
+        geometry:
+          $ref: '#/components/schemas/LineString'
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Segment'
+        checkpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/Checkpoint'
+      required:
+      - checkpoints
+      - geometry
+      - id
+      - rank
+      - rationale
+      - segments
+      - summary
+    RouteSummary:
+      type: object
+      properties:
+        distance_miles:
+          type: number
+          format: double
+        duration_seconds:
+          type: integer
+        arrival_at:
+          type: string
+          format: date-time
+        severe_miles:
+          type: number
+          format: double
+        high_miles:
+          type: number
+          format: double
+        moderate_miles:
+          type: number
+          format: double
+        low_miles:
+          type: number
+          format: double
+        no_travel_miles:
+          type: number
+          format: double
+        unknown_miles:
+          type: number
+          format: double
+        average_risk:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - arrival_at
+      - average_risk
+      - distance_miles
+      - duration_seconds
+      - high_miles
+      - low_miles
+      - moderate_miles
+      - no_travel_miles
+      - severe_miles
+      - unknown_miles
+    Segment:
+      type: object
+      properties:
+        risk:
+          $ref: '#/components/schemas/RiskOrUnknownEnum'
+        from_mile:
+          type: number
+          format: double
+        to_mile:
+          type: number
+          format: double
+        coordinates:
+          type: array
+          description: '[longitude, latitude] pairs, as GeoJSON orders them.'
+          items:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+      required:
+      - coordinates
+      - from_mile
+      - risk
+      - to_mile
+    TypeEnum:
+      enum:
+      - LineString
+      type: string
+      description: '* `LineString` - LineString'
+    Weather:
+      type: object
+      properties:
+        wind_mph:
+          type: number
+          format: double
+        rain_in_hr:
+          type: number
+          format: double
+        snow_in_hr:
+          type: number
+          format: double
+      required:
+      - rain_in_hr
+      - snow_in_hr
+      - wind_mph

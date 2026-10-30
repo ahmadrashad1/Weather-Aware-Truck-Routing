@@ -26,10 +26,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "drf_spectacular",
     "routing",
 ]
 
 MIDDLEWARE = [
+    "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -58,6 +60,24 @@ OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY", "")
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [],
+    "UNAUTHENTICATED_USER": None,
+    "EXCEPTION_HANDLER": "routing.api.errors.exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # These protect the provider quotas, which are shared by every user of the app.
+    "DEFAULT_THROTTLE_RATES": {"trip_plan": "30/hour", "geocode": "120/minute"},
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Weather-Aware Truck Routing API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "ENUM_NAME_OVERRIDES": {
+        "RiskEnum": "routing.api.serializers.RISK_CODES",
+        "RiskOrUnknownEnum": "routing.api.serializers.RISK_OR_UNKNOWN_CODES",
+    },
 }
 
 USE_TZ = True

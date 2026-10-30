@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from math import inf
@@ -95,6 +95,58 @@ def rank_routes(scores: Mapping[str, RouteScore]) -> RankingResult:
         recommended_id=recommended_id,
         no_safe_route=all(score.no_travel_miles > 0 for score in scores.values()),
     )
+
+
+def explain_rank(score: RouteScore, neighbour: RouteScore | None, recommended: bool) -> str:
+    """Say why a route sits where it does, naming the criterion that decided it.
+
+    `neighbour` is the next route down for the recommended route, otherwise the route above.
+    """
+    if score.no_travel_miles > 0:
+        return f"Has {score.no_travel_miles:.0f} No Travel miles, so it cannot be recommended."
+    if score.average_risk is None:
+        return "No weather data is available, so it cannot be recommended."
+    if neighbour is None:
+        return "The only route available."
+    deciding = _deciding_criterion(score, neighbour)
+    if deciding is None:
+        return "Tied with the next route on every criterion."
+    fewest, most, formatter = deciding
+    comparison = f"{formatter(score)} vs {formatter(neighbour)}"
+    if recommended:
+        return f"Recommended for {fewest} ({comparison})."
+    if score.unknown_miles > 0:
+        return f"Weather is missing for {score.unknown_miles:.0f} miles, so it ranks lower."
+    return f"Ranks lower for {most} ({comparison})."
+
+
+def _deciding_criterion(
+    score: RouteScore, neighbour: RouteScore
+) -> tuple[str, str, Callable[[RouteScore], str]] | None:
+    first_key = rank_key(score)
+    second_key = rank_key(neighbour)
+    if first_key[:2] != second_key[:2]:
+        return (
+            "complete weather",
+            "missing weather",
+            lambda s: f"{s.unknown_miles:.0f} mi missing",
+        )
+    criteria = {
+        2: ("fewest No Travel miles", "more No Travel miles", lambda s: f"{s.no_travel_miles:.1f}"),
+        3: ("fewest Severe miles", "more Severe miles", lambda s: f"{s.severe_miles:.1f}"),
+        4: ("fewest High miles", "more High miles", lambda s: f"{s.high_miles:.1f}"),
+        5: ("lowest average risk", "higher average risk", lambda s: f"{s.average_risk:.2f}"),
+        6: ("shortest travel time", "longer travel time", lambda s: _hours(s.duration_seconds)),
+    }
+    for index, criterion in criteria.items():
+        if first_key[index] != second_key[index]:
+            return criterion
+    return None
+
+
+def _hours(seconds: int) -> str:
+    hours, remainder = divmod(seconds, 3600)
+    return f"{hours}h {remainder // 60:02d}m"
 
 
 def _can_recommend(score: RouteScore) -> bool:

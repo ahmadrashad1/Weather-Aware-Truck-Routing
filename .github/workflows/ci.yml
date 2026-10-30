@@ -24,6 +24,12 @@ jobs:
         env:
           DJANGO_DEBUG: "true" # django-stubs imports settings; no secret needed in DEBUG
       - run: uv run pytest --cov --cov-report=term-missing
+      - name: Check the API schema is current
+        run: |
+          uv run python manage.py spectacular --validate --fail-on-warn --file "$RUNNER_TEMP/schema.yml"
+          diff schema.yml "$RUNNER_TEMP/schema.yml"
+        env:
+          DJANGO_DEBUG: "true"
 
   frontend:
     runs-on: ubuntu-latest
