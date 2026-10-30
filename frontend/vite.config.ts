@@ -17,5 +17,7 @@ export default defineConfig({
     globals: false,
     setupFiles: ['./src/test-setup.ts'],
     css: false,
+    // Simulated typing is slow on a busy machine, and these limits only matter when a test hangs.
+    testTimeout: 30_000,
   },
 })
