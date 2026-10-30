@@ -21,6 +21,8 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy .
+        env:
+          DJANGO_DEBUG: "true" # django-stubs imports settings; no secret needed in DEBUG
       - run: uv run pytest --cov --cov-report=term-missing
 
   frontend:
@@ -70,6 +72,9 @@ jobs:
         run: |
           failed=0
           shas=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[].sha')
+          if [ -z "$shas" ]; then
+            echo "::error::No commits found for PR $PR"; exit 1
+          fi
           for sha in $shas; do
             commit=$(gh api "repos/$REPO/commits/$sha")
             verified=$(jq -r '.commit.verification.verified' <<<"$commit")

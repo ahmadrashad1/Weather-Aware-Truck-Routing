@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -10,14 +12,13 @@ def env_list(name: str) -> list[str]:
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "").lower() in {"1", "true", "yes"}
 
-# Dev-only fallback so tests and local runs work without configuration; production must set it.
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or (
-    "insecure-dev-key" if DEBUG else "insecure-test-key-not-for-production"
-)
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set unless DJANGO_DEBUG is true")
+    SECRET_KEY = "insecure-dev-key"  # DEBUG-only; never used in production
 
-ALLOWED_HOSTS = env_list("ALLOWED_HOSTS") or (
-    ["*"] if DEBUG else ["localhost", "127.0.0.1", "testserver"]
-)
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS") or (["*"] if DEBUG else ["localhost", "127.0.0.1"])
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
 
 INSTALLED_APPS = [
