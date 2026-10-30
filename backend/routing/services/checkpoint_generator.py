@@ -34,13 +34,13 @@ def generate_checkpoints(
     if len(geometry) < 2:
         raise ValueError("Route geometry needs at least two points")
 
-    cumulative = _scaled_cumulative_miles(geometry, total_miles)
+    cumulative = scaled_cumulative_miles(geometry, total_miles)
     marks = _checkpoint_miles(total_miles, interval_miles)
     boundaries = [0.0, *((a + b) / 2 for a, b in pairwise(marks)), total_miles]
     return [
         Checkpoint(
             mile=mile,
-            position=_position_at(mile, geometry, cumulative),
+            position=position_at(mile, geometry, cumulative),
             represented_miles=end - start,
             start_mile=start,
             end_mile=end,
@@ -49,7 +49,7 @@ def generate_checkpoints(
     ]
 
 
-def _scaled_cumulative_miles(geometry: Sequence[LatLon], total_miles: float) -> list[float]:
+def scaled_cumulative_miles(geometry: Sequence[LatLon], total_miles: float) -> list[float]:
     legs = [haversine_miles(a, b) for a, b in pairwise(geometry)]
     geometry_miles = sum(legs)
     if geometry_miles == 0:
@@ -63,7 +63,7 @@ def _checkpoint_miles(total_miles: float, interval_miles: int) -> list[float]:
     return [float(step * interval_miles) for step in range(count + 1)] + [float(total_miles)]
 
 
-def _position_at(mile: float, geometry: Sequence[LatLon], cumulative: Sequence[float]) -> LatLon:
+def position_at(mile: float, geometry: Sequence[LatLon], cumulative: Sequence[float]) -> LatLon:
     if mile <= 0:
         return geometry[0]
     if mile >= cumulative[-1]:
