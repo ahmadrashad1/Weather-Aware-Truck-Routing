@@ -6,7 +6,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage'] },
+  { ignores: ['dist', 'coverage', 'src/api/schema.d.ts'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -17,5 +17,10 @@ export default tseslint.config(
       prettier,
     ],
     languageOptions: { globals: globals.browser },
+  },
+  {
+    // shadcn/ui exports variant helpers beside its components by design.
+    files: ['src/components/ui/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
 )
