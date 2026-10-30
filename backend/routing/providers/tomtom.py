@@ -1,5 +1,3 @@
-import logging
-import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -8,18 +6,17 @@ from urllib.parse import quote
 import httpx
 
 from routing.providers.base import Place, ProviderRoute
-from routing.providers.errors import NoRouteFound, ProviderRateLimited, ProviderUnavailable
+from routing.providers.errors import NoRouteFound, ProviderUnavailable
+from routing.providers.http import (
+    DEFAULT_RETRY_DELAY_SECONDS,
+    REQUEST_TIMEOUT_SECONDS,
+    get_with_retries,
+)
 from routing.services.eta_calculator import TravelProfile
 from routing.services.geometry import LatLon
 
-# TomTom takes its key in the query string, and httpx logs full request URLs at INFO.
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-
 ROUTING_URL = "https://api.tomtom.com/routing/1/calculateRoute"
 SEARCH_URL = "https://api.tomtom.com/search/2/search"
-TIMEOUT_SECONDS = 30
-SERVER_ERROR_RETRIES = 2
 SEARCH_RESULT_LIMIT = 5
 # The assessment's rules are in miles, mph and pounds, so this serves US trips.
 SEARCH_COUNTRIES = "US"
@@ -42,10 +39,10 @@ class TomTomProvider:
         self,
         api_key: str,
         client: httpx.Client | None = None,
-        retry_delay_seconds: float = 0.5,
+        retry_delay_seconds: float = DEFAULT_RETRY_DELAY_SECONDS,
     ) -> None:
         self._api_key = api_key
-        self._client = client or httpx.Client(timeout=TIMEOUT_SECONDS)
+        self._client = client or httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
         self._retry_delay_seconds = retry_delay_seconds
 
     def routes(
@@ -111,17 +108,13 @@ class TomTomProvider:
     def _get(self, url: str, params: Mapping[str, str | int]) -> httpx.Response:
         if not self._api_key:
             raise ProviderUnavailable("TomTom API key is not configured")
-        for attempt in range(SERVER_ERROR_RETRIES + 1):
-            if attempt:
-                time.sleep(self._retry_delay_seconds)
-            try:
-                response = self._client.get(url, params={**params, "key": self._api_key})
-            except httpx.HTTPError:
-                raise ProviderUnavailable("TomTom could not be reached") from None
-            if response.status_code < 500:
-                break
-        if response.status_code == 429:
-            raise ProviderRateLimited("TomTom rate limit reached")
+        response = get_with_retries(
+            self._client,
+            url,
+            {**params, "key": self._api_key},
+            "TomTom",
+            self._retry_delay_seconds,
+        )
         if response.status_code >= 400 and not _is_no_route(response):
             raise ProviderUnavailable(f"TomTom returned HTTP {response.status_code}")
         return response

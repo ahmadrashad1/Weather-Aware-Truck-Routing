@@ -44,7 +44,13 @@ REDIS_URL = os.environ.get("REDIS_URL", "")
 CACHES = (
     {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}}
     if REDIS_URL
-    else {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    else {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # The default of 300 entries is less than one long trip's weather cells.
+            "OPTIONS": {"MAX_ENTRIES": 10_000},
+        }
+    }
 )
 
 TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")

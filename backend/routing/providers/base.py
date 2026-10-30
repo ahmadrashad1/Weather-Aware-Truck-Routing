@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
@@ -20,6 +21,14 @@ class Place:
     position: LatLon
 
 
+@dataclass(frozen=True)
+class HourlyForecast:
+    times_utc: tuple[datetime, ...]
+    wind_mph: tuple[float | None, ...]
+    rain_in_hr: tuple[float | None, ...]
+    snow_in_hr: tuple[float | None, ...]
+
+
 class RoutingProvider(Protocol):
     def routes(
         self,
@@ -34,3 +43,7 @@ class RoutingProvider(Protocol):
 
 class GeocodingProvider(Protocol):
     def search(self, query: str) -> list[Place]: ...
+
+
+class WeatherProvider(Protocol):
+    def hourly(self, cells: Sequence[LatLon]) -> dict[LatLon, HourlyForecast]: ...
