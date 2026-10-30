@@ -3,17 +3,32 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --border: oklch(0.922 0 0);
-  --radius: 0.625rem;
+  /* Highway sign colours: asphalt, poured concrete, guide-sign green, warning amber. */
+  --asphalt: #1f2529;
+  --concrete: #eef0ec;
+  --sign-green: #0a5c45;
+  --amber: #f2b705;
+  --risk-severe: #c4122f;
+
+  --background: #ffffff;
+  --foreground: var(--asphalt);
+  --primary: var(--asphalt);
+  --primary-foreground: #ffffff;
+  --muted: var(--concrete);
+  --muted-foreground: #5a6469;
+  --border: #c9cec9;
+  --input: #8f989c;
+  --ring: var(--sign-green);
+  --radius: 0.375rem;
 }
 
 @theme inline {
+  --font-sans: 'Overpass Variable', ui-sans-serif, system-ui, sans-serif;
+  --color-asphalt: var(--asphalt);
+  --color-concrete: var(--concrete);
+  --color-sign-green: var(--sign-green);
+  --color-amber: var(--amber);
+  --color-risk-severe: var(--risk-severe);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
@@ -21,6 +36,8 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --radius-lg: var(--radius);
 }
 

@@ -11,12 +11,16 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:api": "openapi-typescript ../backend/schema.yml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@fontsource-variable/overpass": "^5.3.0",
+    "@tanstack/react-query": "^5.105.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.65.0",
+    "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0"
@@ -37,6 +41,7 @@
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
     "jsdom": "^30.1.3",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9",
