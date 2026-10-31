@@ -1,0 +1,50 @@
+# Keep a forwarded scheme from a load balancer in front of this server, if there is one.
+map $http_x_forwarded_proto $forwarded_proto {
+  default $http_x_forwarded_proto;
+  '' $scheme;
+}
+
+server {
+  listen 8080;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  gzip on;
+  gzip_vary on;
+  gzip_min_length 1024;
+  gzip_types text/javascript application/javascript text/css application/json image/svg+xml;
+
+  # Built files have a content hash in their name, so they can be cached for good.
+  location /assets/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    try_files $uri =404;
+
+    # Browsers refuse a module worker unless it is served as JavaScript, and nginx's default
+    # types don't cover .mjs. MapLibre's worker needs this, or the map never draws.
+    location ~ \.mjs$ {
+      types { }
+      default_type text/javascript;
+      add_header Cache-Control "public, max-age=31536000, immutable";
+      try_files $uri =404;
+    }
+  }
+
+  location /api/ {
+    # Looking the API up per request means nginx can start, and recover, without it.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=30s;
+    set $api_upstream ${API_UPSTREAM};
+    proxy_pass $api_upstream;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    # A long trip can wait out the weather service's per-minute limit.
+    proxy_read_timeout 170s;
+    # Three route lines at the API's limit of 20,000 points each.
+    client_max_body_size 2m;
+  }
+
+  location / {
+    add_header Cache-Control "no-cache";
+    try_files $uri /index.html;
+  }
+}

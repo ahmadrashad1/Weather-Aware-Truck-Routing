@@ -15,4 +15,4 @@ USER app
 ENV PATH="/app/.venv/bin:$PATH" PORT=8000
 EXPOSE 8000
 # Threads and a long timeout because a request can wait out a provider's per-minute rate limit.
-CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --worker-class gthread --threads 8 --timeout 150"]
+CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --worker-class gthread --threads 8 --timeout 150 --access-logfile -"]

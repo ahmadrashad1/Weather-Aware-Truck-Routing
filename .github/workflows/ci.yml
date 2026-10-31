@@ -77,26 +77,28 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    env:
+      # Enough to start the stack. CI never calls the real providers.
+      DJANGO_SECRET_KEY: ci-only-secret-key-that-is-long-enough-for-the-deployment-checks
+      TOMTOM_API_KEY: ci-placeholder
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: backend
-          push: false
-      - uses: docker/build-push-action@v6
-        with:
-          context: frontend
-          push: false
-          load: true
-          tags: frontend:ci
+      - name: Start the full stack
+        run: docker compose up --build --detach --wait
+      - name: Check the frontend reaches the API
+        run: |
+          curl -fsS http://127.0.0.1:8080/api/v1/health | grep '"status": "ok"'
       - name: Check the map worker is served as JavaScript
         run: |
-          docker run -d --name frontend -p 8080:8080 frontend:ci
-          worker=$(docker exec frontend sh -c 'ls /usr/share/nginx/html/assets | grep maplibre-gl-worker')
-          # Retry on any error, as a fresh container can reset connections until nginx is up.
-          curl -fsSI --retry 10 --retry-all-errors --retry-delay 1 "http://127.0.0.1:8080/assets/$worker" \
-            | grep -i '^content-type: text/javascript'
+          worker=$(docker compose exec -T frontend sh -c 'ls /usr/share/nginx/html/assets | grep maplibre-gl-worker')
+          curl -fsSI "http://127.0.0.1:8080/assets/$worker" | grep -i '^content-type: text/javascript'
+      - name: Check assets are compressed
+        run: |
+          script=$(curl -fsS http://127.0.0.1:8080/ | grep -o 'assets/[^"]*\.js' | head -1)
+          curl -fsSI -H 'Accept-Encoding: gzip' "http://127.0.0.1:8080/$script" | grep -i '^content-encoding: gzip'
+      - name: Show logs after a failure
+        if: failure()
+        run: docker compose logs
 
   commit-policy:
     if: github.event_name == 'pull_request'

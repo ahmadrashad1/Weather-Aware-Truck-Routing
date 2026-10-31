@@ -30,7 +30,7 @@ dev = [
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["."]
 testpaths = ["tests"]
-env = ["DJANGO_SECRET_KEY=test-only-secret-not-for-production"]
+env = ["DJANGO_DEBUG=true"]
 
 [tool.ruff]
 line-length = 100
