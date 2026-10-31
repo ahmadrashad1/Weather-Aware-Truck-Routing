@@ -12,13 +12,15 @@ def env_list(name: str) -> list[str]:
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "").lower() in {"1", "true", "yes"}
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
-if not SECRET_KEY:
-    if not DEBUG:
-        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set unless DJANGO_DEBUG is true")
-    SECRET_KEY = "insecure-dev-key"  # DEBUG-only; never used in production
+# Production must not start half-configured, with a known secret or a per-process cache.
+if not DEBUG:
+    for required in ("DJANGO_SECRET_KEY", "ALLOWED_HOSTS", "TOMTOM_API_KEY", "REDIS_URL"):
+        if not os.environ.get(required):
+            raise ImproperlyConfigured(f"{required} must be set unless DJANGO_DEBUG is true")
 
-ALLOWED_HOSTS = env_list("ALLOWED_HOSTS") or (["*"] if DEBUG else ["localhost", "127.0.0.1"])
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or "insecure-dev-key"  # The default is DEBUG-only.
+
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS") or ["*"]
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
 
 INSTALLED_APPS = [
@@ -35,6 +37,8 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -44,7 +48,14 @@ DATABASES: dict[str, dict[str, str]] = {}
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
 CACHES = (
-    {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}}
+    {
+        "default": {
+            "BACKEND": "config.cache.ResilientRedisCache",
+            "LOCATION": REDIS_URL,
+            # Fail fast if Redis is down, so a request falls back to the provider quickly.
+            "OPTIONS": {"socket_connect_timeout": 1, "socket_timeout": 2},
+        }
+    }
     if REDIS_URL
     else {
         "default": {
@@ -58,7 +69,25 @@ CACHES = (
 TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")
 OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY", "")
 
+# How many trusted proxies sit in front of the app. Forwarded headers are spoofable without one, so
+# they are ignored unless this is set. Set too low, all users share one rate limit.
+NUM_PROXIES = int(os.environ["NUM_PROXIES"]) if os.environ.get("NUM_PROXIES") else None
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if NUM_PROXIES else None
+
+SECURE_SSL_REDIRECT = (
+    not DEBUG and os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "true").lower() != "false"
+)
+# A load balancer's health check usually arrives over plain HTTP.
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health$"]
+SECURE_HSTS_SECONDS = 0 if DEBUG else 31_536_000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+# HSTS preload is a permanent browser-list commitment for a domain, which is the owner's decision.
+SILENCED_SYSTEM_CHECKS = ["security.W021"]
+
 REST_FRAMEWORK = {
+    "NUM_PROXIES": NUM_PROXIES,
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],

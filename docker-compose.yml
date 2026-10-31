@@ -1,0 +1,44 @@
+services:
+  redis:
+    image: redis:7-alpine
+    # The cache can always be rebuilt, so it needs no persistence and may drop old entries.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+      TOMTOM_API_KEY: ${TOMTOM_API_KEY:?Set TOMTOM_API_KEY in .env}
+      OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+      # The internal names are for the frontend's proxy and the health check below.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost},127.0.0.1,backend
+      REDIS_URL: redis://redis:6379/0
+      NUM_PROXIES: ${NUM_PROXIES:-1}
+      # This stack serves plain HTTP. Set it to true when HTTPS is in front of it.
+      DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-false}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_UPSTREAM: http://backend:8000
+    ports:
+      - "${PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
