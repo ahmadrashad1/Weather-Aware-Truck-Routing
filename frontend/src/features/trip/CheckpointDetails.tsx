@@ -1,5 +1,5 @@
 import type { Checkpoint, RiskCode, Route } from '@/api/client'
-import { formatEta, formatMiles } from '@/lib/format'
+import { formatEta, formatMileMarker } from '@/lib/format'
 import { RISK_DISPLAY } from '@/lib/risk'
 import { cn } from '@/lib/utils'
 
@@ -102,7 +102,7 @@ export function CheckpointDetails({
             >
               <span>
                 <span className="block font-semibold">
-                  Mile {formatMiles(checkpoint.mile).replace(' mi', '')}
+                  {formatMileMarker(checkpoint.mile)}
                 </span>
                 <span className="block text-asphalt/70">
                   {formatEta(checkpoint.eta)}

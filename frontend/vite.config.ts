@@ -9,6 +9,10 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
+  build: {
+    // MapLibre is a large library, but it loads in its own chunk after the form appears.
+    chunkSizeWarningLimit: 1200,
+  },
   server: {
     proxy: { '/api': 'http://127.0.0.1:8000' },
   },

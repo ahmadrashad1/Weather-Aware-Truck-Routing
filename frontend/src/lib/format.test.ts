@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatDuration,
   formatEta,
+  formatMileMarker,
   formatMiles,
   localInputToOffsetIso,
   nextHourLocalInput,
@@ -27,6 +28,16 @@ describe('formatMiles', () => {
     [3032.49, '3,032.5 mi'],
   ])('formats %f', (miles, expected) => {
     expect(formatMiles(miles)).toBe(expected)
+  })
+})
+
+describe('formatMileMarker', () => {
+  it.each([
+    [0, 'Mile 0'],
+    [50, 'Mile 50'],
+    [1250.25, 'Mile 1,250.3'],
+  ])('formats %f', (mile, expected) => {
+    expect(formatMileMarker(mile)).toBe(expected)
   })
 })
 

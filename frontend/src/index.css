@@ -46,3 +46,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* The map's stylesheet sets its own type and spacing on these. */
+.maplibregl-map .maplibregl-popup-content {
+  font-family: inherit;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+}
