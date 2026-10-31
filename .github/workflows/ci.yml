@@ -66,6 +66,15 @@ jobs:
         with:
           context: frontend
           push: false
+          load: true
+          tags: frontend:ci
+      - name: Check the map worker is served as JavaScript
+        run: |
+          docker run -d --name frontend -p 8080:8080 frontend:ci
+          worker=$(docker exec frontend sh -c 'ls /usr/share/nginx/html/assets | grep maplibre-gl-worker')
+          # Retry on any error, as a fresh container can reset connections until nginx is up.
+          curl -fsSI --retry 10 --retry-all-errors --retry-delay 1 "http://127.0.0.1:8080/assets/$worker" \
+            | grep -i '^content-type: text/javascript'
 
   commit-policy:
     if: github.event_name == 'pull_request'

@@ -6,6 +6,10 @@ export function formatMiles(miles: number): string {
   return `${milesFormat.format(miles)} mi`
 }
 
+export function formatMileMarker(mile: number): string {
+  return `Mile ${milesFormat.format(mile)}`
+}
+
 export function formatDuration(seconds: number): string {
   const totalMinutes = Math.round(seconds / 60)
   const hours = Math.floor(totalMinutes / 60)

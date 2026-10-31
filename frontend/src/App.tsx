@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { lazy, Suspense, useCallback, useState } from 'react'
 
 import type { PlanRequest } from '@/api/client'
 import { usePlanTrip } from '@/api/queries'
+import { MapErrorBoundary } from '@/features/map/MapErrorBoundary'
 import { Alerts } from '@/features/trip/Alerts'
 import { CheckpointDetails } from '@/features/trip/CheckpointDetails'
 import { RouteList } from '@/features/trip/RouteList'
 import { TripForm } from '@/features/trip/TripForm'
+
+// MapLibre is most of the bundle, so the form appears before it finishes loading.
+const MapPanel = lazy(() => import('@/features/map/MapPanel'))
 
 function App() {
   const planTrip = usePlanTrip()
@@ -32,6 +36,25 @@ function App() {
     if (planTrip.variables) submit(planTrip.variables)
   }
 
+  const selectRoute = useCallback((routeId: string) => {
+    setChosenRouteId(routeId)
+    setChosenCheckpointId(null)
+  }, [])
+
+  const selectCheckpointOnMap = useCallback(
+    (routeId: string, checkpointId: string | null) => {
+      setChosenRouteId(routeId)
+      setChosenCheckpointId(checkpointId)
+    },
+    [],
+  )
+
+  const toggleCheckpointInList = useCallback((checkpointId: string) => {
+    setChosenCheckpointId((current) =>
+      current === checkpointId ? null : checkpointId,
+    )
+  }, [])
+
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh lg:flex-row">
       <aside className="flex flex-col gap-4 bg-concrete p-4 lg:w-[26rem] lg:shrink-0 lg:overflow-y-auto">
@@ -53,10 +76,7 @@ function App() {
           <RouteList
             plan={plan}
             selectedRouteId={selectedRouteId}
-            onSelect={(routeId) => {
-              setChosenRouteId(routeId)
-              setChosenCheckpointId(null)
-            }}
+            onSelect={selectRoute}
           />
         ) : null}
         {selectedRoute ? (
@@ -67,14 +87,28 @@ function App() {
             <CheckpointDetails
               route={selectedRoute}
               selectedCheckpointId={chosenCheckpointId}
-              onSelect={setChosenCheckpointId}
+              onSelect={toggleCheckpointInList}
             />
           </section>
         ) : null}
       </aside>
-      <main className="flex min-h-[50dvh] flex-1 items-center justify-center bg-asphalt/5 p-6 text-center">
+      {/* On a phone the map stays in view above the lists, so a selection shows straight away. */}
+      <main className="sticky top-0 z-30 order-first flex h-[42dvh] items-center justify-center bg-asphalt/5 lg:static lg:order-none lg:h-auto lg:flex-1">
+        <MapErrorBoundary>
+          <Suspense
+            fallback={<p className="text-asphalt/70">Loading the map</p>}
+          >
+            <MapPanel
+              plan={plan}
+              selectedRouteId={selectedRouteId}
+              selectedCheckpointId={chosenCheckpointId}
+              onSelectRoute={selectRoute}
+              onSelectCheckpoint={selectCheckpointOnMap}
+            />
+          </Suspense>
+        </MapErrorBoundary>
         {plan ? null : (
-          <p className="max-w-sm text-asphalt/70">
+          <p className="pointer-events-none absolute right-0 bottom-8 left-0 mx-auto w-fit max-w-[90%] rounded-md bg-white/95 px-3 py-1.5 text-center text-sm shadow-sm">
             Enter a trip to compare three routes by weather risk.
           </p>
         )}
