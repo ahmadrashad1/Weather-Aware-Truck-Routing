@@ -3,3 +3,5 @@ dist
 coverage
 .env
 Dockerfile
+playwright-report
+test-results

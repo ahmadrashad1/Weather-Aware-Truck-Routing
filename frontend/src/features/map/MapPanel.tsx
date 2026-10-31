@@ -12,7 +12,7 @@ import {
   type MapRef,
 } from 'react-map-gl/maplibre'
 
-import type { PlanResponse } from '@/api/client'
+import type { HeatmapResponse, PlanResponse } from '@/api/client'
 import { cn } from '@/lib/utils'
 
 import {
@@ -23,6 +23,7 @@ import {
 } from './buildGeoJson'
 import { CheckpointLayer } from './CheckpointLayer'
 import { CheckpointPopup } from './CheckpointPopup'
+import { HeatmapLayer } from './HeatmapLayer'
 import { Legend } from './Legend'
 import { RouteLayers } from './RouteLayers'
 
@@ -34,7 +35,10 @@ const CONTINENTAL_US = { longitude: -98, latitude: 39, zoom: 3.4 }
 const MAP_STYLE = { width: '100%', height: '100%' }
 const COMPACT_ATTRIBUTION = { compact: true }
 const FIT_PADDING = 60
+// Room for the forecast panel, which floats over the bottom of the map on a wide screen.
+const WIDE_SCREEN_FIT_PADDING = { top: 60, left: 60, right: 60, bottom: 190 }
 const FIT_MAX_ZOOM = 11
+const PHONE_POPUP_OFFSET_SHARE = 0.35
 const ANIMATION_MS = 700
 const INTERACTIVE_LAYERS = [CHECKPOINT_LAYER, ROUTE_HIT_LAYER]
 
@@ -45,12 +49,24 @@ function animationMs(): number {
   return reduceMotion ? 0 : ANIMATION_MS
 }
 
+function isNarrowScreen(): boolean {
+  return (
+    typeof window.matchMedia === 'function' &&
+    !window.matchMedia('(min-width: 1024px)').matches
+  )
+}
+
+function fitPadding() {
+  return isNarrowScreen() ? FIT_PADDING : WIDE_SCREEN_FIT_PADDING
+}
+
 function layerOf(feature: MapGeoJSONFeature, layerId: string): boolean {
   return feature.layer.id === layerId
 }
 
 interface MapPanelProps {
   plan: PlanResponse | undefined
+  heatmap?: HeatmapResponse
   selectedRouteId: string | null
   selectedCheckpointId: string | null
   onSelectRoute: (routeId: string) => void
@@ -59,6 +75,7 @@ interface MapPanelProps {
 
 function MapPanel({
   plan,
+  heatmap,
   selectedRouteId,
   selectedCheckpointId,
   onSelectRoute,
@@ -83,7 +100,7 @@ function MapPanel({
     const bounds = plan ? planBounds(plan) : null
     if (!isLoaded || !bounds) return
     mapRef.current?.fitBounds(bounds, {
-      padding: FIT_PADDING,
+      padding: fitPadding(),
       maxZoom: FIT_MAX_ZOOM,
       duration: animationMs(),
     })
@@ -96,7 +113,14 @@ function MapPanel({
       selectedCheckpoint.lon,
       selectedCheckpoint.lat,
     ]
-    if (!map.getBounds().contains(center)) {
+    if (isNarrowScreen()) {
+      // The map is short on a phone, so put the point low enough for its popup to fit above it.
+      const offset: [number, number] = [
+        0,
+        map.getContainer().clientHeight * PHONE_POPUP_OFFSET_SHARE,
+      ]
+      map.easeTo({ center, offset, duration: animationMs() })
+    } else if (!map.getBounds().contains(center)) {
       map.easeTo({ center, duration: animationMs() })
     }
   }, [selectedCheckpoint, isLoaded])
@@ -141,6 +165,7 @@ function MapPanel({
               selectedRouteId={selectedRouteId}
               selectedCheckpointId={selectedCheckpointId}
             />
+            {heatmap ? <HeatmapLayer data={heatmap} /> : null}
           </>
         ) : null}
         {labels.map(({ route, lon, lat }) => {

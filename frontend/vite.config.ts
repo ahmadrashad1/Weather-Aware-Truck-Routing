@@ -21,6 +21,8 @@ export default defineConfig({
     globals: false,
     setupFiles: ['./src/test-setup.ts'],
     css: false,
+    // Playwright runs these against a real browser.
+    exclude: ['**/node_modules/**', 'e2e/**'],
     // Simulated typing is slow on a busy machine, and these limits only matter when a test hangs.
     testTimeout: 30_000,
   },
