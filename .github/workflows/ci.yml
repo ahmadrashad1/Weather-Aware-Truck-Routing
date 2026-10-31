@@ -86,7 +86,8 @@ jobs:
       - name: Start the full stack
         run: docker compose up --build --detach --wait
       - name: Check the frontend reaches the API
-        run: curl -fsS http://127.0.0.1:8080/api/v1/health | grep '"status": "ok"'
+        run: |
+          curl -fsS http://127.0.0.1:8080/api/v1/health | grep '"status": "ok"'
       - name: Check the map worker is served as JavaScript
         run: |
           worker=$(docker compose exec -T frontend sh -c 'ls /usr/share/nginx/html/assets | grep maplibre-gl-worker')
