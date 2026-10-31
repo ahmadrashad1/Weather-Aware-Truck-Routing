@@ -1,7 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode, Ref } from 'react'
-import { useImperativeHandle } from 'react'
+import { Profiler, useImperativeHandle } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -11,7 +11,16 @@ import {
   unknownCheckpoint,
 } from '@/test/fixtures/plan'
 
+import { forecastStore } from '@/features/forecast/forecastStore'
+
 import MapPanel from './MapPanel'
+
+const HEATMAP = {
+  departure_at: '2026-11-01T15:00:00Z',
+  hours: 49,
+  points: [[-97, 33]],
+  risk: [Array.from({ length: 49 }, () => 1)],
+}
 
 // jsdom has no WebGL, so only the map library's React components are replaced. The app's own
 // layers, data and event handling all run for real. A real browser check covers the rest.
@@ -42,6 +51,7 @@ vi.mock('react-map-gl/maplibre', () => ({
       fitBounds: fake.fitBounds,
       easeTo: fake.easeTo,
       getBounds: () => ({ contains: fake.contains }),
+      getContainer: () => ({ clientHeight: 300 }),
     }))
     return <div data-testid="map">{children}</div>
   },
@@ -81,6 +91,7 @@ vi.mock('react-map-gl/maplibre', () => ({
     </div>
   ),
   NavigationControl: () => null,
+  useMap: () => ({ current: undefined }),
 }))
 
 function setup(overrides: Partial<Parameters<typeof MapPanel>[0]> = {}) {
@@ -191,11 +202,61 @@ describe('MapPanel', () => {
   it('jumps instead of animating when reduced motion is requested', () => {
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => ({ matches: true })),
+      vi.fn((query: string) => ({ matches: query.includes('reduced-motion') })),
     )
     setup()
     loadMap()
     expect(fake.fitBounds.mock.calls[0][1]).toMatchObject({ duration: 0 })
+  })
+
+  it('leaves room for the forecast panel when it floats over a wide map', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({ matches: query.includes('min-width') })),
+    )
+    setup()
+    loadMap()
+    const padding = fake.fitBounds.mock.calls[0][1].padding
+    expect(padding.bottom).toBeGreaterThan(padding.top)
+  })
+
+  it('uses even padding on a phone, where the panel sits below the map', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
+    setup()
+    loadMap()
+    expect(fake.fitBounds.mock.calls[0][1].padding).toBe(60)
+  })
+
+  it('moving the forecast hour does not re-render the map panel', () => {
+    const onRender = vi.fn()
+    render(
+      <Profiler id="map" onRender={onRender}>
+        <MapPanel
+          plan={plan}
+          heatmap={HEATMAP}
+          selectedRouteId="route-1"
+          selectedCheckpointId={null}
+          onSelectRoute={vi.fn()}
+          onSelectCheckpoint={vi.fn()}
+        />
+      </Profiler>,
+    )
+    const commits = onRender.mock.calls.length
+    act(() => {
+      for (let hour = 0; hour <= 48; hour += 1) forecastStore.set(hour)
+    })
+    expect(onRender.mock.calls.length).toBe(commits)
+    forecastStore.set(0)
+  })
+
+  it('adds the corridor heatmap only once its data arrives', () => {
+    const { rerender, props } = setup()
+    expect(fake.sources['corridor']).toBeUndefined()
+    rerender(<MapPanel {...props} heatmap={HEATMAP} />)
+    expect(fake.sources['corridor']).toBeDefined()
   })
 
   it('shows no route layers before a plan exists', () => {
@@ -315,6 +376,21 @@ describe('MapPanel', () => {
     loadMap()
     rerender(<MapPanel {...props} selectedCheckpointId={severeCheckpoint.id} />)
     expect(fake.easeTo).not.toHaveBeenCalled()
+  })
+
+  it('on a phone, moves a selected checkpoint low so its whole popup fits', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
+    const { rerender, props } = setup()
+    loadMap()
+    rerender(<MapPanel {...props} selectedCheckpointId={severeCheckpoint.id} />)
+    expect(fake.easeTo).toHaveBeenCalledTimes(1)
+    expect(fake.easeTo.mock.calls[0][0]).toMatchObject({
+      center: [severeCheckpoint.lon, severeCheckpoint.lat],
+      offset: [0, 105],
+    })
   })
 
   it('labels each route and selects it from the label', async () => {

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,13 +34,28 @@ vi.mock('@/features/map/MapPanel', () => ({
 const DALLAS = { label: 'Dallas, TX', lat: 32.77, lon: -96.79 }
 const DENVER = { label: 'Denver, CO', lat: 39.73, lon: -104.99 }
 
-function stubApi(planResponse: () => Response) {
+function emptyHeatmap() {
+  return {
+    departure_at: '2026-11-01T15:00:00Z',
+    hours: 49,
+    points: [[-97, 33]],
+    risk: [Array.from({ length: 49 }, () => 0)],
+  }
+}
+
+function stubApi(
+  planResponse: () => Response,
+  heatmapResponse: () => unknown = emptyHeatmap,
+) {
   const fetchMock = vi.fn<
     (input: string, init?: RequestInit) => Promise<Response>
   >((input) => {
     if (input.includes('/geocode')) {
       const results = input.includes('Dal') ? [DALLAS] : [DENVER]
       return Promise.resolve(jsonResponse({ results }))
+    }
+    if (input.includes('/trips/heatmap')) {
+      return Promise.resolve(jsonResponse(heatmapResponse()))
     }
     return Promise.resolve(planResponse())
   })
@@ -180,6 +195,71 @@ describe('App', () => {
     expect(row).toHaveAttribute('aria-expanded', 'true')
     await user.click(row)
     expect(row).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('shows the routes first, then the forecast slider once its data arrives', async () => {
+    const user = userEvent.setup()
+    stubApi(() => jsonResponse(plan))
+    renderWithQueries(<App />)
+    await submitTrip(user)
+
+    await screen.findByRole('button', { name: /Route 1/ })
+    expect(
+      await screen.findByRole('slider', { name: 'Forecast hour' }),
+    ).toBeInTheDocument()
+  })
+
+  it('asks for the heatmap with the plan’s routes, departure and load', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubApi(() => jsonResponse(plan))
+    renderWithQueries(<App />)
+    await submitTrip(user)
+    await screen.findByRole('slider', { name: 'Forecast hour' })
+
+    const call = fetchMock.mock.calls.find(([url]) =>
+      url.includes('/trips/heatmap'),
+    )
+    const body = JSON.parse(String(call?.[1]?.body))
+    expect(body.routes).toHaveLength(plan.routes.length)
+    expect(body.load_lb).toBe(45000)
+  })
+
+  it('returns the slider to hour 0 for a new plan', async () => {
+    const user = userEvent.setup()
+    stubApi(() => jsonResponse(plan))
+    renderWithQueries(<App />)
+    await submitTrip(user)
+    const slider = await screen.findByRole('slider', { name: 'Forecast hour' })
+    fireEvent.change(slider, { target: { value: '30' } })
+
+    await user.click(screen.getByRole('button', { name: 'Plan routes' }))
+    expect(
+      await screen.findByRole('slider', { name: 'Forecast hour' }),
+    ).toHaveValue('0')
+  })
+
+  it('keeps routes usable when only the heatmap fails', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn((input: string) => {
+      if (input.includes('/geocode')) {
+        const results = input.includes('Dal') ? [DALLAS] : [DENVER]
+        return Promise.resolve(jsonResponse({ results }))
+      }
+      if (input.includes('/trips/heatmap')) {
+        return Promise.resolve(
+          jsonResponse({ code: 'rate_limited', message: 'Too many.' }, 429),
+        )
+      }
+      return Promise.resolve(jsonResponse(plan))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderWithQueries(<App />)
+    await submitTrip(user)
+
+    expect(
+      await screen.findByRole('button', { name: /Route 1/ }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText('Too many.')).toBeInTheDocument()
   })
 
   it('keeps the form usable after an outage and can retry', async () => {
