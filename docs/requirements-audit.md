@@ -60,7 +60,7 @@ An independent review of the whole project found and fixed five issues, recorded
 | Hosted application | Live at <https://3-24-117-219.sslip.io>. Checked with a real browser at desktop and mobile widths, including canvas clicks, with no console errors. |
 | Long trips work through the full path | New York to Los Angeles at 10-mile sampling: 83s for routes and 88s with the heatmap. |
 | Fits the server | The same trip peaked at 583 MB of 909 MB, with 14 MB of swap and no container restarts. |
-| Deploys itself | A merge updated the server without help, and the workflow waited for the new version. |
+| Deploys through GitHub OIDC | See the `Deploy` workflow. A workflow without the `production` environment is refused by AWS, and a non-main branch is refused the environment. |
 | Forged headers are ignored | A forged `X-Forwarded-For` didn't reach the app. |
 
 ## Engineering rules

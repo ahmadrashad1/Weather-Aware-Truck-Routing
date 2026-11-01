@@ -139,7 +139,7 @@ GitHub Actions runs on every pull request and every push to `main`:
 
 CI needs no secrets and never calls the real providers. The separate `Live smoke test` workflow does, so it only runs when started by hand, and it needs a `TOMTOM_API_KEY` repository secret.
 
-When CI passes on `main`, the `Deploy` workflow publishes the images and waits for the server to run them.
+When CI passes on `main`, the `Deploy` workflow publishes the images and deploys them through GitHub OIDC.
 
 ## Decisions where the assessment leaves room
 
@@ -176,7 +176,7 @@ Forecasts are cached in the app's memory for an hour by location, on a grid of a
 
 ## Deploying
 
-The app runs on one Amazon Lightsail server for $7 a month. After CI passes on `main`, GitHub publishes new images, and the server pulls them, checks they're healthy, and rolls back if they aren't. GitHub holds no AWS credentials or SSH keys. [docs/deployment.md](docs/deployment.md) covers how it works, how to set up a server, and how to operate it.
+The app runs on one Amazon Lightsail server for $7 a month. After CI passes on `main`, GitHub publishes new images, signs in to AWS through GitHub OIDC, and updates the server, which rolls back if the new version isn't healthy. GitHub stores no AWS keys. [docs/deployment.md](docs/deployment.md) covers how it works, how to set up a server, and how to operate it.
 
 ## Repository rules
 

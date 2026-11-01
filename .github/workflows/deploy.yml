@@ -1,7 +1,7 @@
 name: Deploy
 
-# Publishes images once CI passes on main. The server notices the new `production` tag and updates
-# itself, so GitHub holds no AWS credentials or SSH keys. See docs/deployment.md.
+# Publishes images once CI passes on main, then deploys them through GitHub OIDC. The job gets
+# short-lived AWS credentials, so GitHub stores no AWS keys. See docs/deployment.md.
 on:
   workflow_run:
     workflows: [CI]
@@ -27,12 +27,18 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    # The AWS role trusts this environment only, and the environment only allows main.
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
     permissions:
       contents: read
       packages: write
+      id-token: write
     env:
       REVISION: ${{ github.event.workflow_run.head_sha || github.sha }}
       IMAGES: ghcr.io/ahmadrashad1/weather-aware-truck-routing
+      INSTANCE: truck-routing
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,17 +79,70 @@ jobs:
             docker buildx imagetools create \
               --tag "$IMAGES/$image:production" "$IMAGES/$image:$REVISION"
           done
-      - name: Wait for the server to run this revision
-        if: vars.PRODUCTION_URL != ''
+      - name: Sign in to AWS through OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: deploy-${{ github.run_id }}
+          role-duration-seconds: 1800
+          aws-region: ap-southeast-2
+      - name: Open SSH to this runner only
+        run: |
+          runner_ip="$(curl -fsS --max-time 10 https://checkip.amazonaws.com)"
+          echo "::add-mask::$runner_ip"
+          echo "RUNNER_IP=$runner_ip" >> "$GITHUB_ENV"
+          aws lightsail open-instance-public-ports --instance-name "$INSTANCE" \
+            --port-info "fromPort=22,toPort=22,protocol=tcp,cidrs=$runner_ip/32"
+      - name: Deploy on the server
+        timeout-minutes: 12
+        env:
+          SERVER_KNOWN_HOSTS: ${{ vars.SERVER_KNOWN_HOSTS }}
+        run: |
+          # Lightsail issues an SSH key and certificate that expire within minutes.
+          keys="$RUNNER_TEMP/ssh"
+          mkdir -m 700 "$keys"
+          aws lightsail get-instance-access-details --instance-name "$INSTANCE" --protocol ssh > "$keys/access.json"
+          jq -r .accessDetails.privateKey "$keys/access.json" > "$keys/key"
+          jq -r .accessDetails.certKey "$keys/access.json" > "$keys/key-cert.pub"
+          user="$(jq -r .accessDetails.username "$keys/access.json")"
+          address="$(jq -r .accessDetails.ipAddress "$keys/access.json")"
+          rm "$keys/access.json"
+          chmod 600 "$keys/key"
+          printf '%s\n' "$SERVER_KNOWN_HOSTS" > "$keys/known_hosts"
+
+          # The firewall change can take a moment to apply.
+          # A failed or rolled-back update makes this step fail.
+          ssh_to_server() {
+            ssh -i "$keys/key" -o CertificateFile="$keys/key-cert.pub" \
+              -o UserKnownHostsFile="$keys/known_hosts" -o StrictHostKeyChecking=yes \
+              -o BatchMode=yes -o ConnectTimeout=10 "$user@$address" "$@"
+          }
+          for attempt in $(seq 1 12); do
+            ssh_to_server true && break
+            [ "$attempt" = 12 ] && { echo "::error::Couldn't connect to the server"; exit 1; }
+            sleep 5
+          done
+          if ! ssh_to_server sudo systemctl start truck-routing-update.service; then
+            ssh_to_server sudo journalctl -u truck-routing-update --no-pager -n 40 -o cat || true
+            echo "::error::The update failed on the server, so it rolled back. See docs/deployment.md."
+            exit 1
+          fi
+          ssh_to_server sudo journalctl -u truck-routing-update --no-pager -n 3 -o cat
+      - name: Close SSH
+        if: always() && env.RUNNER_IP != ''
+        run: |
+          aws lightsail close-instance-public-ports --instance-name "$INSTANCE" \
+            --port-info "fromPort=22,toPort=22,protocol=tcp,cidrs=$RUNNER_IP/32"
+      - name: Confirm the public site runs this revision
         env:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
         run: |
-          for _ in $(seq 1 40); do
+          for _ in $(seq 1 12); do
             if curl -fsS --max-time 10 "$PRODUCTION_URL/api/v1/health" | grep -q "\"version\": \"$REVISION\""; then
-              echo "The server is running $REVISION"
+              echo "The public site is running $REVISION"
               exit 0
             fi
-            sleep 15
+            sleep 5
           done
-          echo "::error::The server didn't start $REVISION within 10 minutes, so it either failed and rolled back or isn't updating. See docs/deployment.md."
+          echo "::error::The public site isn't reporting $REVISION."
           exit 1
