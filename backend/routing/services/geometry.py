@@ -9,8 +9,11 @@ MILES_PER_DEGREE_LATITUDE = math.radians(EARTH_RADIUS_MILES)
 
 
 def haversine_miles(a: LatLon, b: LatLon) -> float:
-    lat_a, lon_a = map(math.radians, a)
-    lat_b, lon_b = map(math.radians, b)
+    # Called hundreds of thousands of times per long trip, so this avoids building iterators.
+    lat_a = math.radians(a[0])
+    lon_a = math.radians(a[1])
+    lat_b = math.radians(b[0])
+    lon_b = math.radians(b[1])
     half_chord = (
         math.sin((lat_b - lat_a) / 2) ** 2
         + math.cos(lat_a) * math.cos(lat_b) * math.sin((lon_b - lon_a) / 2) ** 2

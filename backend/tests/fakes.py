@@ -63,7 +63,9 @@ class FakeWeather:
         self.failures = list(failures)
         self.requests: list[list[LatLon]] = []
 
-    def hourly(self, cells: Sequence[LatLon]) -> dict[LatLon, HourlyForecast]:
+    def hourly(
+        self, cells: Sequence[LatLon], forecast_days: int = 16
+    ) -> dict[LatLon, HourlyForecast]:
         self.requests.append(list(cells))
         if self.error:
             raise self.error

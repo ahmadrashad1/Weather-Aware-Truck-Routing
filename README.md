@@ -98,6 +98,7 @@ Errors share one shape: `{"code", "message", "fields"}`, where `fields` only app
 | 400 | `validation_error` | Invalid input, with details in `fields` |
 | 422 | `no_route` | No truck route connects the two places |
 | 429 | `rate_limited` | Too many requests, here or at a provider |
+| 503 | `busy` | The server is at its limit for trips running at once |
 | 429 | `quota_exhausted` | The weather budget for this IP or the whole app was reached |
 | 503 | `provider_unavailable` | The routing or weather service is down |
 

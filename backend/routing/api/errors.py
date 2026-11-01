@@ -5,12 +5,15 @@ from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
+from routing.api.capacity import ServerBusy
 from routing.providers.errors import NoRouteFound, ProviderRateLimited, ProviderUnavailable
 from routing.services.weather_budget import Purpose, WeatherBudgetExceeded
 
 logger = logging.getLogger(__name__)
 
 RATE_LIMIT_MESSAGE = "Too many requests right now. Please try again in a minute."
+BUSY_MESSAGE = "The server is busy with other trips. Please try again in a moment."
+BUSY_RETRY_SECONDS = 15
 HEATMAP_QUOTA_MESSAGE = (
     "Forecast shading is unavailable right now because the weather data limit is close. "
     "Route risks are not affected."
@@ -32,6 +35,12 @@ def exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
         return Response(
             error_body("no_route", "No truck route connects these locations."),
             status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    if isinstance(exc, ServerBusy):
+        return Response(
+            error_body("busy", BUSY_MESSAGE),
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            headers={"Retry-After": str(BUSY_RETRY_SECONDS)},
         )
     if isinstance(exc, WeatherBudgetExceeded):
         return Response(

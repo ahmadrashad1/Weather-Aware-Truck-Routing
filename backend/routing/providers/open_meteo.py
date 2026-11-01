@@ -17,6 +17,9 @@ FREE_URL = "https://api.open-meteo.com/v1/forecast"
 PAID_URL = "https://customer-api.open-meteo.com/v1/forecast"
 MAX_CELLS_PER_REQUEST = 100
 FORECAST_DAYS = 16
+# A shorter forecast for trips soon after today takes about half as long to fetch, and about a
+# fifth of the memory to cache. Open-Meteo also counts over 2 weeks per location as extra calls.
+SHORT_FORECAST_DAYS = 7
 # Each location counts as one call, so the free tier allows 600 cells per minute (measured; the
 # docs do not say). The hourly limit is 5,000 and the daily limit 10,000.
 MINUTE_LIMIT_RESET_SECONDS = 60
@@ -39,7 +42,9 @@ class OpenMeteoProvider:
         self._client = client or httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
         self._retry_delay_seconds = retry_delay_seconds
 
-    def hourly(self, cells: Sequence[LatLon]) -> dict[LatLon, HourlyForecast]:
+    def hourly(
+        self, cells: Sequence[LatLon], forecast_days: int = FORECAST_DAYS
+    ) -> dict[LatLon, HourlyForecast]:
         """Fetch hourly forecasts. Send at most MAX_CELLS_PER_REQUEST cells per call.
 
         Units stay in mm and cm and are converted here, because the docs do not say whether
@@ -54,7 +59,7 @@ class OpenMeteoProvider:
             "wind_speed_unit": "mph",
             "timezone": "GMT",
             "timeformat": "unixtime",
-            "forecast_days": FORECAST_DAYS,
+            "forecast_days": forecast_days,
         }
         if self._api_key:
             params["apikey"] = self._api_key

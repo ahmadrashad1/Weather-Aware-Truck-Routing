@@ -25,6 +25,9 @@ const latency = {
 }
 const refused = new Counter('busy_or_refused')
 
+// A clear refusal is the server protecting itself, so count it separately from failures.
+http.setResponseCallback(http.expectedStatuses(200, 204, 429, 503))
+
 export const options = {
   scenarios: { trips: { executor: 'ramping-vus', startVUs: 1, stages, gracefulRampDown: '180s', gracefulStop: '180s' } },
   thresholds: {

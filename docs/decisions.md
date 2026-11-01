@@ -109,6 +109,10 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - Django logs requests in place of Gunicorn's access log — the access log includes search text — cost if wrong: requests rejected before Django aren't logged.
 - `web-vitals` was added for browser timings, reported to our own API instead of an outside service — no account or new data processor is needed — cost if wrong: one small dependency to remove.
 - TomTom results are never cached on the server — clause 11.4 of its terms bans caching that serves several users — cost if wrong: repeat trips and searches keep spending TomTom quota, which is the price of following the terms.
+- Trips needing weather only within about a week fetch a 7-day forecast instead of 16 — a batch of 100 locations measured about half the time and a fifth of the data — cost if wrong: entries for the two lengths are cached separately, so some forecasts are fetched twice.
+- Six heavy requests run at once per worker, and more get a `busy` error rather than queueing — this keeps threads free for searches and health checks — cost if wrong: the limit hasn't been reached in a load test, so it could refuse trips the server could have handled.
+- The load test uses invented routes, not recorded ones — TomTom's terms don't allow storing its results — cost if wrong: real route shapes could cost more or less CPU.
+- Redis and more workers are an optional overlay, not switched on — the load test stopped before comparing them, and they use memory on a small server — cost if wrong: one worker's CPU remains the limit until someone turns the overlay on.
 
 ## Known minor issues, left as they are
 

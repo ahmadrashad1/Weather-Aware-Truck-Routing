@@ -26,7 +26,6 @@ EARTH_RADIUS_MILES = 3958.8
 POINTS_PER_MILE = 16
 TRUCK_MPH = 55
 ROAD_FACTOR = 1.2
-HOURS = 16 * 24
 # Seconds, from the live server's report.
 DELAY = {"route": 0.9, "search": 0.25, "caption": 0.25, "forecast": 0.8}
 
@@ -85,29 +84,30 @@ def route_body(stops, alternatives):
     return json.dumps({"routes": [invent_route(origin, destination, bow) for bow in bows]}).encode()
 
 
-@lru_cache(maxsize=4)
-def forecast_series(day, variant):
+@lru_cache(maxsize=16)
+def forecast_series(day, variant, days):
     """The arrays for one location, as text, so that a batch of 100 costs almost no CPU here."""
     start = day * 86400
-    wind = [round(6 + variant * 4 + 3 * math.sin(hour / 6), 1) for hour in range(HOURS)]
-    rain = [round(0.6 * variant * max(math.sin(hour / 11), 0), 2) for hour in range(HOURS)]
+    hours = days * 24
+    wind = [round(6 + variant * 4 + 3 * math.sin(hour / 6), 1) for hour in range(hours)]
+    rain = [round(0.6 * variant * max(math.sin(hour / 11), 0), 2) for hour in range(hours)]
     return json.dumps(
         {
-            "time": [start + hour * 3600 for hour in range(HOURS)],
+            "time": [start + hour * 3600 for hour in range(hours)],
             "wind_speed_10m": wind,
             "rain": rain,
-            "showers": [0.0] * HOURS,
-            "snowfall": [0.0] * HOURS,
+            "showers": [0.0] * hours,
+            "snowfall": [0.0] * hours,
         }
     )
 
 
-def forecast_body(lats, lons):
+def forecast_body(lats, lons, days):
     day = int(time.time() // 86400)
     items = []
     for lat, lon in zip(lats, lons, strict=True):
         variant = int(abs(float(lat) * 20 + float(lon) * 20)) % 4
-        series = forecast_series(day, variant)
+        series = forecast_series(day, variant, days)
         items.append(f'{{"latitude":{lat},"longitude":{lon},"hourly":{series}}}')
     text = items[0] if len(items) == 1 else "[" + ",".join(items) + "]"
     return text.encode()
@@ -208,7 +208,7 @@ class Handler(BaseHTTPRequestHandler):
             reason = b'{"error":true,"reason":"Minutely API request limit exceeded."}'
             self.send_json(reason, 429)
             return
-        self.send_json(forecast_body(lats, lons))
+        self.send_json(forecast_body(lats, lons, int(query.get("forecast_days", ["16"])[0])))
 
 
 class Server(ThreadingHTTPServer):

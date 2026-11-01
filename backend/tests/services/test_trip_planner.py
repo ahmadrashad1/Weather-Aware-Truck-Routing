@@ -1,9 +1,10 @@
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from routing.domain import RiskLevel
-from routing.providers.base import Place, ProviderRoute
+from routing.providers.base import HourlyForecast, Place, ProviderRoute
 from routing.providers.errors import NoRouteFound, ProviderUnavailable
 from routing.services.eta_calculator import TravelProfile
 from routing.services.geometry import LatLon, haversine_miles
@@ -165,7 +166,7 @@ def test_partial_weather_outage_warns_and_ranks_complete_routes_first() -> None:
     lookup = WeatherLookup(weather)
     original = weather.hourly
 
-    def fail_for_west(cells: list[LatLon]) -> dict:  # type: ignore[type-arg]
+    def fail_for_west(cells: list[LatLon], forecast_days: int = 16) -> dict:  # type: ignore[type-arg]
         forecasts = original(cells)
         return {cell: forecast for cell, forecast in forecasts.items() if cell[1] != WEST}
 
@@ -234,3 +235,24 @@ def test_simplify_keeps_detail_above_the_tolerance() -> None:
 def test_simplify_drops_points_within_the_tolerance() -> None:
     wobble: list[LatLon] = [(30.0 + i * 0.01, -100.0 + (i % 2) * 0.0001) for i in range(10)]
     assert simplify_indices(wobble, 0.0005) == [0, 9]
+
+
+def test_the_forecast_requested_covers_the_slowest_route() -> None:
+    class Recording:
+        needed: datetime | None = None
+
+        def forecasts(
+            self, positions: Sequence[LatLon], needed_until: datetime | None = None
+        ) -> dict[LatLon, HourlyForecast | None]:
+            Recording.needed = needed_until
+            return dict.fromkeys(positions)
+
+    departure = datetime(2026, 11, 2, 12, tzinfo=UTC)
+    routing = FakeRouting(
+        [straight_route(100, 7200, lon=-100.0), straight_route(300, 36_000, lon=-90.0)]
+    )
+    request = TripRequest(
+        Place("a", (30.0, -100.0)), Place("b", (31.0, -100.0)), departure, 1000, 50
+    )
+    plan_trip(request, routing, Recording())
+    assert Recording.needed == departure + timedelta(seconds=36_000)
