@@ -1,0 +1,5 @@
+{$SITE_ADDRESS} {
+	# Caddy gets and renews the certificate, and redirects HTTP to HTTPS. It sets no limit on how
+	# long the API can take, which long trips need.
+	reverse_proxy frontend:8080
+}

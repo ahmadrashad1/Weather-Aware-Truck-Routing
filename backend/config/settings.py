@@ -14,7 +14,7 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "").lower() in {"1", "true", "yes"}
 
 # Production must not start half-configured, with a known secret or a per-process cache.
 if not DEBUG:
-    for required in ("DJANGO_SECRET_KEY", "ALLOWED_HOSTS", "TOMTOM_API_KEY", "REDIS_URL"):
+    for required in ("DJANGO_SECRET_KEY", "ALLOWED_HOSTS", "TOMTOM_API_KEY"):
         if not os.environ.get(required):
             raise ImproperlyConfigured(f"{required} must be set unless DJANGO_DEBUG is true")
 
@@ -60,14 +60,17 @@ CACHES = (
     else {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            # The default of 300 entries is less than one long trip's weather cells.
-            "OPTIONS": {"MAX_ENTRIES": 10_000},
+            # This cache belongs to one process, so it suits the single worker the app runs. The
+            # default of 300 entries is less than one long trip's weather cells, and this limit
+            # keeps it to about 100 MB on a small server.
+            "OPTIONS": {"MAX_ENTRIES": 5_000},
         }
     }
 )
 
 TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")
 OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY", "")
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
 # How many trusted proxies sit in front of the app. Forwarded headers can be forged, so with 0 they
 # are ignored and the connection's own address identifies the client. Behind a proxy, set this or

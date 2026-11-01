@@ -1,0 +1,10 @@
+[Unit]
+Description=Deploy the published revision of Weather-Aware Truck Routing
+After=docker.service network-online.target
+Wants=network-online.target
+# Nothing runs until the API keys have been added.
+ConditionPathExists=/opt/truck-routing/.env
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/truck-routing/repo/deploy/update.sh

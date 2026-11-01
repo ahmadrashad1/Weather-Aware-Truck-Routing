@@ -13,9 +13,9 @@ A React and Django app that helps a truck driver choose the safest route. Enter 
 
 ```mermaid
 flowchart LR
-    Browser["React + MapLibre"] --> Nginx["nginx: static files and /api proxy"]
-    Nginx --> Django["Django REST API"]
-    Django --> Redis[("Redis cache")]
+    Browser["React + MapLibre"] --> Caddy["Caddy: HTTPS"]
+    Caddy --> Nginx["nginx: app files and /api proxy"]
+    Nginx --> Django["Django REST API, with an in-process cache"]
     Django --> TomTom["TomTom: routes and place search"]
     Django --> OpenMeteo["Open-Meteo: forecasts"]
 ```
@@ -65,16 +65,16 @@ npm run dev
 
 ## Configuration
 
-`.env.example` lists every setting. In production the backend refuses to start without `DJANGO_SECRET_KEY`, `ALLOWED_HOSTS`, `TOMTOM_API_KEY` and `REDIS_URL`.
+`.env.example` lists every setting. In production the backend refuses to start without `DJANGO_SECRET_KEY`, `ALLOWED_HOSTS` and `TOMTOM_API_KEY`.
 
 | Setting | Purpose |
 | --- | --- |
 | `TOMTOM_API_KEY` | Routes and place search. Stays on the server. |
 | `DJANGO_SECRET_KEY` | Django's signing key. |
 | `ALLOWED_HOSTS` | Comma-separated hostnames the app is served from. |
-| `REDIS_URL` | Cache for forecasts and rate limits. `docker-compose.yml` provides its own. |
+| `REDIS_URL` | Optional shared cache. Without it the app caches in its own process, which suits one server. |
 | `OPEN_METEO_API_KEY` | Optional paid key, needed for commercial use. |
-| `NUM_PROXIES` | Trusted proxies in front of the backend, used to find the client's IP. `docker-compose.yml` defaults to 1, and it's 0 otherwise. |
+| `NUM_PROXIES` | Trusted proxies in front of the backend, used to find the client's IP. `docker-compose.yml` defaults to 1, the server uses 2, and it's 0 otherwise. |
 | `DJANGO_SECURE_SSL_REDIRECT` | Set to `false` only if nothing in front of the app serves HTTPS. |
 | `CORS_ALLOWED_ORIGINS` | Only needed if the frontend is on a different origin. |
 
@@ -137,7 +137,7 @@ GitHub Actions runs on every pull request and every push to `main`:
 
 CI needs no secrets and never calls the real providers. The separate `Live smoke test` workflow does, so it only runs when started by hand, and it needs a `TOMTOM_API_KEY` repository secret.
 
-There is no deployment pipeline yet, on purpose. Only continuous integration is in scope before production.
+When CI passes on `main`, the `Deploy` workflow publishes the images and waits for the server to run them.
 
 ## Decisions where the assessment leaves room
 
@@ -170,19 +170,11 @@ Other choices made along the way:
 | Open-Meteo, free tier | 600 locations a minute, 5,000 an hour, 10,000 a day. Each location counts as one call, which we measured because the docs don't say. Non-commercial use only. | A coast-to-coast trip at 10-mile sampling uses about 850 locations. On an empty cache it waits out the per-minute limit once and takes about 80 seconds. About 8 such trips with heatmaps use the daily limit. |
 | TomTom, free tier | Sources disagree on the current quota, so check your dashboard. | Each plan uses one request, or up to three if detours are needed. Repeat trips aren't cached. |
 
-Forecasts are cached in Redis for an hour by location, on a grid of about 3.5 miles. If Redis goes down, the app keeps working without the cache, but slower and using more quota. Each IP can make 30 plans and 30 heatmaps an hour, and 120 place searches a minute.
+Forecasts are cached in the app's memory for an hour by location, on a grid of about 3.5 miles, so a restart or update empties the cache. Each IP can make 30 plans and 30 heatmaps an hour, and 120 place searches a minute.
 
 ## Deploying
 
-The Compose file runs the whole stack, so any host that runs containers will work. The host needs to:
-
-1. **Serve HTTPS in front of the frontend container.** Then set `DJANGO_SECURE_SSL_REDIRECT=true`.
-2. **Set the settings.** Generate a new `DJANGO_SECRET_KEY`, and set `ALLOWED_HOSTS` to your domain.
-3. **Count its proxies.** Set `NUM_PROXIES=2` if a load balancer is in front of nginx, or every user will share one rate limit.
-4. **Allow slow requests.** A long trip can take about 80 seconds. A load balancer that cuts requests off at 30 seconds will break those trips.
-5. **Check health** at `/api/v1/health`.
-
-For separate services, set `API_UPSTREAM` on the frontend container to the backend's URL. Commercial use also needs a paid Open-Meteo key.
+The app runs on one Amazon Lightsail server for $7 a month. After CI passes on `main`, GitHub publishes new images, and the server pulls them, checks they're healthy, and rolls back if they aren't. GitHub holds no AWS credentials or SSH keys. [docs/deployment.md](docs/deployment.md) covers how it works, how to set up a server, and how to operate it.
 
 ## Repository rules
 

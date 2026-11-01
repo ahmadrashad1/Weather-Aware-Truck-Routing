@@ -45,7 +45,8 @@ An independent review of the whole project found and fixed five issues, recorded
 | Missing or unavailable weather | `services/test_weather_lookup.py`, `services/test_trip_planner.py`, `api/test_plan.py`, `e2e/errors.spec.ts` |
 | API integration failures | `providers/test_tomtom.py`, `providers/test_open_meteo.py`, `api/test_plan.py`, `e2e/errors.spec.ts`. Live: the per-minute weather limit was hit and waited out. |
 | Invalid inputs | `api/test_plan.py`, `api/test_heatmap_api.py`, `TripForm.test.tsx` |
-| Redis outage | `test_cache.py`. Live: Redis was stopped during a run. |
+| Redis outage, if Redis is used | `test_cache.py`. Live: Redis was stopped during a run. The deployed app doesn't use Redis. |
+| Failed deployments | `test_deploy_update.py` runs the server's update script, including rollback |
 | Base map outage | `e2e/errors.spec.ts::routes still draw when the base map fails to load` |
 | Mostly unknown routes | `services/test_route_scorer.py::test_fewer_unknown_miles_outrank_a_cleaner_looking_partial_route` |
 | Forged rate-limit headers | `test_settings.py::test_a_forged_header_cannot_dodge_rate_limits_by_default` |

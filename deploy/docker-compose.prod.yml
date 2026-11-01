@@ -1,0 +1,34 @@
+# Added on top of docker-compose.yml on the server. See docs/deployment.md.
+services:
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Keeps certificates across restarts, as Let's Encrypt limits how often they can be issued.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/ahmadrashad1/weather-aware-truck-routing/backend:${IMAGE_TAG:?Set IMAGE_TAG}
+    environment:
+      # Caddy, then nginx.
+      NUM_PROXIES: "2"
+      DJANGO_SECURE_SSL_REDIRECT: "true"
+
+  frontend:
+    image: ghcr.io/ahmadrashad1/weather-aware-truck-routing/frontend:${IMAGE_TAG:?Set IMAGE_TAG}
+    # Only Caddy talks to it on the server.
+    ports: !reset []
+
+volumes:
+  caddy-data:
+  caddy-config:
