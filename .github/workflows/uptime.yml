@@ -1,0 +1,20 @@
+name: Uptime
+
+# Fails if the public site stops answering, and GitHub emails you about the failed run.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the public site
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          curl -fsS --max-time 15 --retry 3 --retry-all-errors --retry-delay 20 \
+            "$PRODUCTION_URL/api/v1/health" | grep -q '"status": "ok"'

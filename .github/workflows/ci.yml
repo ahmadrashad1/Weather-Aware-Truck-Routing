@@ -86,7 +86,7 @@ jobs:
       - name: Check the deployment scripts
         run: |
           shellcheck --shell=sh deploy/bootstrap.sh
-          shellcheck --shell=bash deploy/update.sh
+          shellcheck --shell=bash deploy/update.sh deploy/run-on-server.sh deploy/aws/alarms.sh
       - name: Start the full stack
         run: docker compose up --build --detach --wait
       - name: Check the frontend reaches the API

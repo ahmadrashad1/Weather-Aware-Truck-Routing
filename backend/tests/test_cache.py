@@ -39,6 +39,9 @@ class TestRedisOutage:
         assert cache.add("key", "value", 60) is False
         assert cache.delete("key") is False
 
+    def test_counters_read_as_zero(self) -> None:
+        assert cache.incr("key", 5) == 0
+
     def test_weather_still_comes_from_the_provider(self) -> None:
         now = datetime(2026, 11, 1, 12, tzinfo=UTC)
         weather = FakeWeather(now)

@@ -1,9 +1,12 @@
 import logging
+import random
 import time
 from collections.abc import Callable, Mapping
 
 import httpx
 
+from config.observability import log_event
+from routing.providers.breaker import breaker_for
 from routing.providers.errors import ProviderRateLimited, ProviderUnavailable
 
 # Providers take API keys in the query string, and httpx logs full request URLs at INFO.
@@ -26,16 +29,39 @@ def get_with_retries(
     """Send a GET, retrying server errors only. Other client errors are for the caller to read.
 
     Errors raised here never chain the httpx exception or include the URL, which holds the key.
+    A rate limit shows the provider is up, so only outages count towards its circuit breaker.
     """
+    breaker = breaker_for(provider_name)
+    if not breaker.allow():
+        raise ProviderUnavailable(f"{provider_name} is paused after repeated failures")
     for attempt in range(SERVER_ERROR_RETRIES + 1):
         if attempt:
-            time.sleep(retry_delay_seconds)
+            # Varied, so requests that failed together don't all retry together.
+            time.sleep(retry_delay_seconds * random.uniform(0.5, 1.5))
+        started = time.perf_counter()
         try:
             response = client.get(url, params=params)
-        except httpx.HTTPError:
+        except httpx.HTTPError as error:
+            log_event(
+                "provider_call",
+                provider=provider_name,
+                error=type(error).__name__,
+                duration_ms=_elapsed_ms(started),
+            )
+            breaker.record_failure()
             raise ProviderUnavailable(f"{provider_name} could not be reached") from None
+        log_event(
+            "provider_call",
+            provider=provider_name,
+            status=response.status_code,
+            duration_ms=_elapsed_ms(started),
+        )
         if response.status_code < 500:
             break
+    if response.status_code >= 500:
+        breaker.record_failure()
+    else:
+        breaker.record_success()
     if response.status_code == 429:
         raise ProviderRateLimited(
             f"{provider_name} rate limit reached",
@@ -44,3 +70,7 @@ def get_with_retries(
     if response.status_code >= 500:
         raise ProviderUnavailable(f"{provider_name} returned HTTP {response.status_code}")
     return response
+
+
+def _elapsed_ms(started: float) -> int:
+    return round((time.perf_counter() - started) * 1000)

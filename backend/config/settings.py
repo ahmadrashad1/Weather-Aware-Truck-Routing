@@ -33,6 +33,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "config.observability.RequestLogMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -104,7 +105,23 @@ REST_FRAMEWORK = {
         "trip_plan": "30/hour",
         "heatmap": "30/hour",
         "geocode": "120/minute",
+        "vitals": "120/hour",
     },
+}
+
+# Forecast locations, counted because Open-Meteo counts each one as a call. Set below its free
+# limits of 5,000 an hour and 10,000 a day, as our counts reset whenever the app restarts. One
+# client's limit covers one coast-to-coast trip at 10-mile checks with its heatmap, and some more.
+WEATHER_BUDGET_LIMITS = {"per_hour": 4_750, "per_day": 9_500, "per_client_hour": 1_500}
+# Heatmaps stop at this share of the shared limits, which keeps the rest for checkpoint risk.
+WEATHER_BUDGET_HEATMAP_SHARE = 0.8
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"json": {"()": "config.observability.JsonFormatter"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
 }
 
 SPECTACULAR_SETTINGS = {

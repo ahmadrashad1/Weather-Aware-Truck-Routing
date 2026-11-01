@@ -1,0 +1,51 @@
+name: Server report
+
+# Prints totals from the server's logs. Run by hand, from main. See docs/deployment.md.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    # The AWS role trusts this environment only, and the environment only allows main.
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      INSTANCE: truck-routing
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign in to AWS through OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: report-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: ap-southeast-2
+      - name: Open SSH to this runner only
+        run: |
+          runner_ip="$(curl -fsS --max-time 10 https://checkip.amazonaws.com)"
+          echo "::add-mask::$runner_ip"
+          echo "RUNNER_IP=$runner_ip" >> "$GITHUB_ENV"
+          aws lightsail open-instance-public-ports --instance-name "$INSTANCE" \
+            --port-info "fromPort=22,toPort=22,protocol=tcp,cidrs=$runner_ip/32"
+      - name: Print the report
+        timeout-minutes: 5
+        env:
+          SERVER_KNOWN_HOSTS: ${{ vars.SERVER_KNOWN_HOSTS }}
+        run: |
+          bash deploy/run-on-server.sh \
+            "sudo sh -c 'docker logs truck-routing-backend-1 2>&1 | python3 /opt/truck-routing/repo/deploy/report.py'"
+      - name: Close SSH
+        if: always() && env.RUNNER_IP != ''
+        run: |
+          aws lightsail close-instance-public-ports --instance-name "$INSTANCE" \
+            --port-info "fromPort=22,toPort=22,protocol=tcp,cidrs=$RUNNER_IP/32"
