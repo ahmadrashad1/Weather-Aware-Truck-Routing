@@ -1,6 +1,7 @@
 name: Uptime
 
-# Fails if the public site stops answering, and GitHub emails you about the failed run.
+# Fails if the public site stops answering. GitHub emails you about the failed run, and once the
+# setup in docs/deployment.md is done, so does Resend.
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -11,6 +12,8 @@ permissions: {}
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check the public site
         env:
@@ -18,3 +21,15 @@ jobs:
         run: |
           curl -fsS --max-time 15 --retry 3 --retry-all-errors --retry-delay 20 \
             "$PRODUCTION_URL/api/v1/health" | grep -q '"status": "ok"'
+      - uses: actions/checkout@v4
+        if: failure() && vars.ALERTS_ENABLED == 'true'
+      - name: Email through Resend
+        if: failure() && vars.ALERTS_ENABLED == 'true'
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          ALERT_FROM: ${{ vars.ALERT_FROM }}
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          bash deploy/send-alert.sh "Site down: $PRODUCTION_URL" \
+            "The uptime check couldn't reach $PRODUCTION_URL/api/v1/health after 3 retries."

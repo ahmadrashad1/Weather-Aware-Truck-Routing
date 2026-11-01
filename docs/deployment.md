@@ -38,7 +38,7 @@ flowchart LR
 | --- | --- |
 | Which workflows can sign in | The role in `deploy/aws/github-trust-policy.json` trusts only this repository's `production` environment |
 | Which branches can use that environment | The environment only allows `main` |
-| What the role can do | `deploy/aws/github-deploy-policy.json` allows getting SSH access to this one server, and opening or closing its ports. It can't create or delete anything, or reach any other service. |
+| What the role can do | `deploy/aws/github-deploy-policy.json` allows getting SSH access to this one server, opening or closing its ports, and reading alarm states. It can't create or delete anything, or reach any other service. |
 
 The SSH access gives root on this server, because the `ubuntu` user has `sudo`. Treat a merge to `main` as deploying to production.
 
@@ -48,17 +48,34 @@ The SSH access gives root on this server, because the `ubuntu` user has `sudo`. 
 | --- | --- |
 | Traffic, latency, cache and quota | Run the `Server report` workflow by hand with `gh workflow run report.yml`, then read its log. It covers the last 24 hours since the last update. |
 | A single request | Each response has an `X-Request-ID` header. Search the logs for it. |
-| Site down | The `Uptime` workflow checks the public site every 15 minutes, and GitHub emails you if it fails. GitHub can delay these runs, and pauses them after 60 days without repository activity. |
+| Site down | The `Uptime` workflow checks the public site every 15 minutes. GitHub emails you if it fails, and Resend does too once set up. GitHub can delay these runs, and pauses them after 60 days without repository activity. |
 | Server health | `deploy/aws/alarms.sh` sets alarms for high CPU, low burst capacity and failed status checks. |
 
 Logs never include API keys, search text, coordinates or IP addresses. The repository is public, so anyone can read the report's totals in the workflow log.
 
-To get alarm emails, add your address once and confirm the email AWS sends, then rerun the script:
+### Alert emails
+
+Alarm changes and uptime failures are emailed through [Resend](https://resend.com). Lightsail alarms can only notify through AWS's own contact methods, so the `Alarm email` workflow checks their states every 15 minutes and emails when one starts or stops firing. GitHub can delay these runs, so an alert can arrive late.
+
+To turn it on, once:
 
 ```bash
-aws lightsail create-contact-method --protocol Email --contact-endpoint you@example.com
-AWS_PROFILE=truck-routing AWS_REGION=ap-southeast-2 deploy/aws/alarms.sh
+# 1. Let the deploy role read alarm states. Sign in first with `aws login`.
+export AWS_PROFILE=truck-routing AWS_REGION=ap-southeast-2
+aws iam put-role-policy --role-name truck-routing-github-deploy \
+  --policy-name reach-truck-routing-server \
+  --policy-document file://deploy/aws/github-deploy-policy.json
+
+# 2. Store your Resend API key and address. Each command prompts, so nothing lands in your history.
+gh secret set RESEND_API_KEY
+gh secret set ALERT_EMAIL
+
+# 3. Turn it on, and test it.
+gh variable set ALERTS_ENABLED --body true
+gh workflow run alarm-email.yml
 ```
+
+The default sender is `onboarding@resend.dev`, which only delivers to the address on your Resend account. To send elsewhere, verify a domain with Resend and set `gh variable set ALERT_FROM --body 'Alerts <alerts@your-domain>'`.
 
 ## Quota protection
 
