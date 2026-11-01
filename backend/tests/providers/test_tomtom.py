@@ -372,3 +372,13 @@ def test_attribution_without_a_cache_header_says_so(provider: TomTomProvider) ->
         return_value=httpx.Response(200, json={"copyrightsCaption": "©TomTom"})
     )
     assert provider.attribution().cache_control is None
+
+
+@respx.mock
+def test_a_base_url_replaces_the_real_host() -> None:
+    route = respx.get("http://stub:9000/map/1/copyrights/caption.json").mock(
+        return_value=httpx.Response(200, json={"copyrightsCaption": "©Stub"})
+    )
+    provider = TomTomProvider(API_KEY, retry_delay_seconds=0, base_url="http://stub:9000")
+    assert provider.attribution().caption == "©Stub"
+    assert route.called

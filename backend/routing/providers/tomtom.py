@@ -15,9 +15,10 @@ from routing.providers.http import (
 from routing.services.eta_calculator import TravelProfile
 from routing.services.geometry import LatLon
 
-ROUTING_URL = "https://api.tomtom.com/routing/1/calculateRoute"
-SEARCH_URL = "https://api.tomtom.com/search/2/search"
-COPYRIGHT_URL = "https://api.tomtom.com/map/1/copyrights/caption.json"
+BASE_URL = "https://api.tomtom.com"
+ROUTING_PATH = "/routing/1/calculateRoute"
+SEARCH_PATH = "/search/2/search"
+COPYRIGHT_PATH = "/map/1/copyrights/caption.json"
 SEARCH_RESULT_LIMIT = 5
 # The assessment's rules are in miles, mph and pounds, so this serves US trips.
 SEARCH_COUNTRIES = "US"
@@ -41,8 +42,10 @@ class TomTomProvider:
         api_key: str,
         client: httpx.Client | None = None,
         retry_delay_seconds: float = DEFAULT_RETRY_DELAY_SECONDS,
+        base_url: str = BASE_URL,
     ) -> None:
         self._api_key = api_key
+        self._base_url = base_url
         self._client = client or httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
         self._retry_delay_seconds = retry_delay_seconds
 
@@ -58,7 +61,7 @@ class TomTomProvider:
         stops = [origin, *([via] if via else []), destination]
         locations = ":".join(f"{lat},{lon}" for lat, lon in stops)
         response = self._get(
-            f"{ROUTING_URL}/{locations}/json",
+            f"{self._base_url}{ROUTING_PATH}/{locations}/json",
             {
                 "travelMode": "truck",
                 "vehicleCommercial": "true",
@@ -86,7 +89,7 @@ class TomTomProvider:
         if not cleaned:
             return []
         response = self._get(
-            f"{SEARCH_URL}/{quote(cleaned, safe='')}.json",
+            f"{self._base_url}{SEARCH_PATH}/{quote(cleaned, safe='')}.json",
             {
                 "limit": SEARCH_RESULT_LIMIT,
                 "typeahead": "true",
@@ -108,7 +111,7 @@ class TomTomProvider:
 
     def attribution(self) -> Attribution:
         """Fetch the credit TomTom's terms require the app to show. Never stored on the server."""
-        response = self._get(COPYRIGHT_URL, {})
+        response = self._get(f"{self._base_url}{COPYRIGHT_PATH}", {})
         body = _json_body(response)
         caption = body.get("copyrightsCaption") if isinstance(body, dict) else None
         if not caption or not isinstance(caption, str):

@@ -117,6 +117,19 @@ WEATHER_BUDGET_LIMITS = {"per_hour": 4_750, "per_day": 9_500, "per_client_hour":
 # Heatmaps stop at this share of the shared limits, which keeps the rest for checkpoint risk.
 WEATHER_BUDGET_HEATMAP_SHARE = 0.8
 
+# A stand-in for TomTom and Open-Meteo, for load tests only. See docs/load-testing.md. Production
+# always redirects to HTTPS, so this refuses to start there. It also lifts the limits per client,
+# because one load generator is one IP, and the point is to find the server's own limits.
+PROVIDER_STUB_URL = os.environ.get("PROVIDER_STUB_URL", "")
+if PROVIDER_STUB_URL:
+    if SECURE_SSL_REDIRECT:
+        raise ImproperlyConfigured("PROVIDER_STUB_URL is for load test stacks without HTTPS")
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+        scope: "1000000/hour"
+        for scope in ("trip_plan", "heatmap", "geocode", "vitals", "attribution")
+    }
+    WEATHER_BUDGET_LIMITS = {name: 1_000_000_000 for name in WEATHER_BUDGET_LIMITS}
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
