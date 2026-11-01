@@ -16,7 +16,7 @@ from routing.services.route_scorer import (
     score_route,
 )
 from routing.services.route_segments import RouteSegment, build_segments, simplify
-from routing.services.weather_lookup import WeatherLookup, sample_at
+from routing.services.weather_lookup import WeatherSource, sample_at
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class TripPlan:
     routes: list[PlannedRoute]
 
 
-def plan_trip(request: TripRequest, routing: RoutingProvider, weather: WeatherLookup) -> TripPlan:
+def plan_trip(request: TripRequest, routing: RoutingProvider, weather: WeatherSource) -> TripPlan:
     """Route, place checkpoints, work out each ETA, read the weather at it, then rank."""
     alternatives = get_three_routes(
         routing,

@@ -20,6 +20,7 @@ DEPARTURE_HORIZON = timedelta(days=14)
 MIN_TRIP_MILES = 0.1
 MAX_HEATMAP_ROUTES = 3
 MAX_ROUTE_POINTS = 20_000
+MAX_VITAL_VALUE = 600_000
 
 RISK_CODES = ["low", "moderate", "high", "severe", "no_travel"]
 RISK_OR_UNKNOWN_CODES = [*RISK_CODES, "unknown"]
@@ -129,6 +130,12 @@ class HeatmapRequestSerializer(serializers.Serializer[Any]):
 
 class GeocodeQuerySerializer(serializers.Serializer[Any]):
     q = serializers.CharField(max_length=200)
+
+
+class VitalSerializer(serializers.Serializer[Any]):
+    name = serializers.ChoiceField(choices=["CLS", "FCP", "INP", "LCP", "TTFB"])
+    value = FiniteFloatField(min_value=0, max_value=MAX_VITAL_VALUE)
+    rating = serializers.ChoiceField(choices=["good", "needs-improvement", "poor"])
 
 
 class ErrorSerializer(serializers.Serializer[Any]):

@@ -101,6 +101,14 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - ALLOWED_HOSTS is still required in production, and `REDIS_URL` no longer is — a server with no Redis must still start — cost if wrong: none.
 - The data credit sits under the page title and in the map's attribution — Open-Meteo's licence asks for it next to wherever its data appears, and the map's control collapses on small screens or after a drag — cost if wrong: a line of text to move. TomTom is credited too, but its exact attribution terms haven't been confirmed.
 
+- A trip over the weather budget is refused whole, not checked in part — partly checked routes would rank by what was fetched, not by weather — cost if wrong: a user waits, even though some of the trip could have been checked.
+- The weather budget doesn't track the per-minute limit — the existing wait on Open-Meteo's minute limit already handles it, and tracking it too would add a second wait path — cost if wrong: long trips still see the occasional rate-limit response.
+- Budget counters live in the shared cache, and only locations actually fetched stay charged — charging failures locked users out after an outage, which a local hang test showed — cost if wrong: a restart or full cache forgets counts, with Open-Meteo's limit as the backstop.
+- Weather loading stops at 120 seconds or after two failed batches in a row — one more request can still take its 30-second timeout, which ends inside nginx's 170-second limit, and one failure alone may be a blip — cost if wrong: very slow provider days show more `unknown` miles.
+- The circuit breaker lives in each process rather than the shared cache — there's one worker, and it needs no extra round trips — cost if wrong: extra workers would each detect an outage separately.
+- Django logs requests in place of Gunicorn's access log — the access log includes search text — cost if wrong: requests rejected before Django aren't logged.
+- `web-vitals` was added for browser timings, reported to our own API instead of an outside service — no account or new data processor is needed — cost if wrong: one small dependency to remove.
+
 ## Known minor issues, left as they are
 
 - CI uses actions and uv by tag, not SHA or pinned uv version.

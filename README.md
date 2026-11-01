@@ -98,6 +98,7 @@ Errors share one shape: `{"code", "message", "fields"}`, where `fields` only app
 | 400 | `validation_error` | Invalid input, with details in `fields` |
 | 422 | `no_route` | No truck route connects the two places |
 | 429 | `rate_limited` | Too many requests, here or at a provider |
+| 429 | `quota_exhausted` | The weather budget for this IP or the whole app was reached |
 | 503 | `provider_unavailable` | The routing or weather service is down |
 
 ## Tests
@@ -172,7 +173,7 @@ Other choices made along the way:
 | Open-Meteo, free tier | 600 locations a minute, 5,000 an hour, 10,000 a day. Each location counts as one call, which we measured because the docs don't say. Non-commercial use only. | A coast-to-coast trip at 10-mile sampling uses about 850 locations. On an empty cache it waits out the per-minute limit once and takes about 80 seconds. About 8 such trips with heatmaps use the daily limit. |
 | TomTom, free tier | Sources disagree on the current quota, so check your dashboard. | Each plan uses one request, or up to three if detours are needed. Repeat trips aren't cached. |
 
-Forecasts are cached in the app's memory for an hour by location, on a grid of about 3.5 miles, so a restart or update empties the cache. Each IP can make 30 plans and 30 heatmaps an hour, and 120 place searches a minute.
+Forecasts are cached in the app's memory for an hour by location, on a grid of about 3.5 miles, so a restart or update empties the cache. Each IP can make 30 plans and 30 heatmaps an hour, and 120 place searches a minute. Each IP can also fetch 1,500 new forecast locations an hour, and the whole app stays under Open-Meteo's free limits. See [docs/deployment.md](docs/deployment.md#quota-protection).
 
 ## Deploying
 

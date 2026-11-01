@@ -42,6 +42,38 @@ flowchart LR
 
 The SSH access gives root on this server, because the `ubuntu` user has `sudo`. Treat a merge to `main` as deploying to production.
 
+## Monitoring
+
+| What | How |
+| --- | --- |
+| Traffic, latency, cache and quota | Run the `Server report` workflow by hand with `gh workflow run report.yml`, then read its log. It covers the last 24 hours since the last update. |
+| A single request | Each response has an `X-Request-ID` header. Search the logs for it. |
+| Site down | The `Uptime` workflow checks the public site every 15 minutes, and GitHub emails you if it fails. GitHub can delay these runs, and pauses them after 60 days without repository activity. |
+| Server health | `deploy/aws/alarms.sh` sets alarms for high CPU, low burst capacity and failed status checks. |
+
+Logs never include API keys, search text, coordinates or IP addresses. The repository is public, so anyone can read the report's totals in the workflow log.
+
+To get alarm emails, add your address once and confirm the email AWS sends, then rerun the script:
+
+```bash
+aws lightsail create-contact-method --protocol Email --contact-endpoint you@example.com
+AWS_PROFILE=truck-routing AWS_REGION=ap-southeast-2 deploy/aws/alarms.sh
+```
+
+## Quota protection
+
+Each forecast location counts as one Open-Meteo call, so the app counts locations rather than requests. Cached locations and failed fetches cost nothing.
+
+| Limit | Locations | When reached |
+| --- | --- | --- |
+| Each IP, per hour | 1,500 | That IP gets a `quota_exhausted` error |
+| Everyone, per hour | 4,750 (heatmaps stop at 3,800) | New trips get the error, and heatmaps stop first |
+| Everyone, per day | 9,500 (heatmaps stop at 7,600) | Same |
+
+A trip over its limit is refused whole, so a route is never ranked on weather that wasn't fetched. Counts reset when the app restarts, and Open-Meteo's own limit is the backstop then.
+
+If a provider fails three times in a row, the app stops calling it for 30 seconds, then tries one request. Weather loading also stops after 120 seconds, or after two failed batches in a row. Anything not loaded by then shows as `unknown`.
+
 ## Set up a new server
 
 These are one-time steps, using the AWS CLI with a profile signed in through `aws login`. Lightsail must be in your project's Region.
@@ -123,7 +155,7 @@ gh api -X POST repos/ahmadrashad1/Weather-Aware-Truck-Routing/environments/produ
   -f name=main -f type=branch
 ```
 
-Then run the `Deploy` workflow by hand for the first deploy.
+Then run the `Deploy` workflow by hand for the first deploy, and `deploy/aws/alarms.sh` to set the alarms.
 
 Rebuilding the server changes its ARN and host key, so update the role's policy and `SERVER_KNOWN_HOSTS` afterwards.
 

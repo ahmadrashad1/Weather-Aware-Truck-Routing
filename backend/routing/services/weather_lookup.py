@@ -1,20 +1,27 @@
 import time
 from bisect import bisect_left
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from itertools import batched
+from typing import Protocol
 
 from django.core.cache import cache
 
+from config.observability import count, log_event
 from routing.domain import WeatherSample
 from routing.providers.base import HourlyForecast, WeatherProvider
 from routing.providers.errors import ProviderError, ProviderRateLimited, ProviderUnavailable
 from routing.providers.open_meteo import MAX_CELLS_PER_REQUEST
 from routing.services.geometry import LatLon
+from routing.services.weather_budget import Purpose, WeatherBudget, WeatherBudgetExceeded
 
 CELLS_PER_DEGREE = 20
 CACHE_SECONDS = 60 * 60
 RATE_LIMIT_WAIT_MARGIN_SECONDS = 1
+# One more request can start just before this and take its 30-second timeout, which still ends
+# within nginx's 170-second limit. A slow provider can't then hold a thread after nginx gives up.
+DEADLINE_SECONDS = 120
 
 
 def snap_to_cell(position: LatLon) -> LatLon:
@@ -59,52 +66,132 @@ def _wind_at(forecast: HourlyForecast, moment: datetime, covering: int) -> float
     return before + (after - before) * ((moment - start) / span)
 
 
+class WeatherSource(Protocol):
+    def forecasts(self, positions: Sequence[LatLon]) -> dict[LatLon, HourlyForecast | None]: ...
+
+
 class WeatherLookup:
     def __init__(
-        self, provider: WeatherProvider, sleep: Callable[[float], None] = time.sleep
+        self,
+        provider: WeatherProvider,
+        sleep: Callable[[float], None] = time.sleep,
+        budget: WeatherBudget | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._provider = provider
         self._sleep = sleep
+        self._budget = budget
+        self._clock = clock
 
-    def forecasts(self, positions: Sequence[LatLon]) -> dict[LatLon, HourlyForecast | None]:
+    def for_request(
+        self, client: str, purpose: Purpose, deadline_seconds: float = DEADLINE_SECONDS
+    ) -> "RequestWeather":
+        """Bind one request's budget and time limit, with the time limit starting now."""
+        return RequestWeather(self, client, purpose, self._clock() + deadline_seconds)
+
+    def forecasts(
+        self, positions: Sequence[LatLon], scope: "RequestWeather | None" = None
+    ) -> dict[LatLon, HourlyForecast | None]:
         """Return each position's forecast, or None where it could not be fetched.
 
         Raises only when no position has a forecast at all, because partial results are still
-        useful: the affected checkpoints become unknown rather than failing the whole trip.
+        useful: the affected checkpoints become unknown rather than failing the whole trip. Being
+        over budget always raises, so a trip is never ranked on weather it chose not to fetch.
         """
         cell_by_position = {position: snap_to_cell(position) for position in positions}
         cells = list(dict.fromkeys(cell_by_position.values()))
-        by_cell, error = self._load(cells)
+        by_cell, error = self._load(cells, scope)
         if cells and not by_cell and error:
             raise error
         return {position: by_cell.get(cell) for position, cell in cell_by_position.items()}
 
     def _load(
-        self, cells: list[LatLon]
+        self, cells: list[LatLon], scope: "RequestWeather | None"
     ) -> tuple[dict[LatLon, HourlyForecast], ProviderError | None]:
         keys = {cell: f"weather:{cell[0]:.2f}:{cell[1]:.2f}" for cell in cells}
         cached = cache.get_many(keys.values())
         found = {cell: cached[key] for cell, key in keys.items() if key in cached}
         missing = [cell for cell in cells if cell not in found]
+        count("weather_cells_cached", len(found))
+        count("weather_cells_fetched", 0)
+        receipt = self._charge(len(missing), scope) if scope else ()
+        try:
+            return self._fetch(missing, keys, found, scope)
+        finally:
+            # Only fetched locations count, so an outage can't lock anyone out once it's over.
+            if self._budget and receipt:
+                self._budget.refund(receipt, sum(cell not in found for cell in missing))
 
+    def _fetch(
+        self,
+        missing: list[LatLon],
+        keys: dict[LatLon, str],
+        found: dict[LatLon, HourlyForecast],
+        scope: "RequestWeather | None",
+    ) -> tuple[dict[LatLon, HourlyForecast], ProviderError | None]:
         error: ProviderError | None = None
         may_wait = True
+        failed_last_batch = False
         for batch in batched(missing, MAX_CELLS_PER_REQUEST, strict=False):
+            if scope and self._clock() >= scope.deadline:
+                log_event("weather_deadline_reached")
+                return found, error or ProviderUnavailable("Weather took too long to load")
             while True:
                 try:
                     fetched = self._provider.hourly(batch)
                 except ProviderRateLimited as rate_limited:
                     # Giving up here would leave later routes unknown and rank them lower because
                     # of request order rather than weather, so wait out a short limit once.
-                    if rate_limited.retry_after_seconds is None or not may_wait:
+                    wait = rate_limited.retry_after_seconds
+                    if wait is None or not may_wait or not self._can_wait(wait, scope):
                         return found, rate_limited
                     may_wait = False
-                    self._sleep(rate_limited.retry_after_seconds + RATE_LIMIT_WAIT_MARGIN_SECONDS)
+                    log_event("weather_rate_limit_wait", seconds=wait)
+                    self._sleep(wait + RATE_LIMIT_WAIT_MARGIN_SECONDS)
                     continue
                 except ProviderUnavailable as unavailable:
+                    # One blip shouldn't lose the rest of a trip, but two suggest an outage, and
+                    # each failure can take a full timeout.
+                    if failed_last_batch:
+                        return found, unavailable
                     error = unavailable
+                    failed_last_batch = True
                     break
+                failed_last_batch = False
                 found.update(fetched)
+                count("weather_cells_fetched", len(fetched))
                 cache.set_many({keys[cell]: fetched[cell] for cell in fetched}, CACHE_SECONDS)
                 break
         return found, error
+
+    def _charge(self, locations: int, scope: "RequestWeather") -> tuple[str, ...]:
+        if not self._budget:
+            return ()
+        try:
+            return self._budget.spend(locations, scope.client, scope.purpose)
+        except WeatherBudgetExceeded as refused:
+            log_event(
+                "weather_budget_refused",
+                window=refused.window,
+                purpose=refused.purpose.value,
+                locations=locations,
+            )
+            raise
+
+    def _can_wait(self, seconds: float, scope: "RequestWeather | None") -> bool:
+        if not scope:
+            return True
+        return self._clock() + seconds + RATE_LIMIT_WAIT_MARGIN_SECONDS < scope.deadline
+
+
+@dataclass(frozen=True)
+class RequestWeather:
+    """A lookup bound to one request's client, purpose and deadline."""
+
+    lookup: WeatherLookup
+    client: str
+    purpose: Purpose
+    deadline: float
+
+    def forecasts(self, positions: Sequence[LatLon]) -> dict[LatLon, HourlyForecast | None]:
+        return self.lookup.forecasts(positions, self)

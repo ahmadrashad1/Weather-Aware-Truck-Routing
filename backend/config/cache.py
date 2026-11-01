@@ -39,6 +39,10 @@ def _nothing_done(*_args: Any, **_kwargs: Any) -> bool:
     return False
 
 
+def _zero(*_args: Any, **_kwargs: Any) -> int:
+    return 0
+
+
 def _nothing_stored(_cache: Any, data: Any, *_args: Any, **_kwargs: Any) -> list[Any]:
     return list(data)
 
@@ -56,3 +60,4 @@ class ResilientRedisCache(RedisCache):
     set_many = _survive_outage(_nothing_stored)(RedisCache.set_many)
     add = _survive_outage(_nothing_done)(RedisCache.add)
     delete = _survive_outage(_nothing_done)(RedisCache.delete)
+    incr = _survive_outage(_zero)(RedisCache.incr)

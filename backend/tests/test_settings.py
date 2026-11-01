@@ -177,3 +177,11 @@ def test_production_code_never_imports_from_tests() -> None:
             if any(name == "tests" or name.startswith("tests.") for name in names):
                 offenders.append(str(path))
     assert offenders == []
+
+
+def test_the_budget_stays_under_open_meteos_free_limits() -> None:
+    from django.conf import settings
+
+    limits = settings.WEATHER_BUDGET_LIMITS
+    assert limits["per_hour"] < 5_000
+    assert limits["per_day"] < 10_000

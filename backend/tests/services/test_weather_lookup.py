@@ -9,6 +9,12 @@ from routing.domain import WeatherSample
 from routing.providers.base import HourlyForecast
 from routing.providers.errors import ProviderRateLimited, ProviderUnavailable
 from routing.services.geometry import LatLon
+from routing.services.weather_budget import (
+    BudgetLimits,
+    Purpose,
+    WeatherBudget,
+    WeatherBudgetExceeded,
+)
 from routing.services.weather_lookup import WeatherLookup, sample_at, snap_to_cell
 
 START = datetime(2026, 11, 1, 14, tzinfo=UTC)
@@ -269,3 +275,129 @@ def test_longer_limit_does_not_wait() -> None:
     WeatherLookup(weather, sleep=naps.append).forecasts(grid(250))
     assert naps == []
     assert len(weather.requests) == 2
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+class SlowWeather(FakeWeather):
+    """Takes `seconds` of the fake clock per request."""
+
+    def __init__(self, clock: Clock, seconds: float, failures: Sequence[Exception | None] = ()):
+        super().__init__(failures)
+        self.clock = clock
+        self.seconds = seconds
+
+    def hourly(self, cells: Sequence[LatLon]) -> dict[LatLon, HourlyForecast]:
+        self.clock.now += self.seconds
+        return super().hourly(cells)
+
+
+def test_a_second_failure_in_a_row_stops_further_batches() -> None:
+    weather = FakeWeather([ProviderUnavailable("down"), ProviderUnavailable("down")])
+    with pytest.raises(ProviderUnavailable):
+        WeatherLookup(weather).forecasts(grid(500))
+    assert len(weather.requests) == 2
+
+
+def test_one_failed_batch_does_not_stop_the_next() -> None:
+    weather = FakeWeather([ProviderUnavailable("down"), None, ProviderUnavailable("down"), None])
+    result = WeatherLookup(weather).forecasts(grid(400))
+    assert len(weather.requests) == 4
+    assert sum(value is None for value in result.values()) == 200
+
+
+def test_deadline_stops_further_batches_and_leaves_their_cells_missing() -> None:
+    clock = Clock()
+    weather = SlowWeather(clock, 10)
+    lookup = WeatherLookup(weather, clock=clock)
+    positions = grid(500)
+    result = lookup.for_request("client", Purpose.CHECKPOINTS, deadline_seconds=25).forecasts(
+        positions
+    )
+    assert len(weather.requests) == 3
+    assert all(result[position] is not None for position in positions[:300])
+    assert all(result[position] is None for position in positions[300:])
+
+
+def test_deadline_with_no_weather_at_all_raises_unavailable() -> None:
+    clock = Clock()
+    clock.now = 0
+    lookup = WeatherLookup(FakeWeather(), clock=clock)
+    scoped = lookup.for_request("client", Purpose.CHECKPOINTS, deadline_seconds=5)
+    clock.now = 6
+    with pytest.raises(ProviderUnavailable):
+        scoped.forecasts(grid(10))
+
+
+def test_a_rate_limit_wait_past_the_deadline_is_not_taken() -> None:
+    clock = Clock()
+    waits: list[float] = []
+    weather = FakeWeather([ProviderRateLimited("slow down", retry_after_seconds=60)])
+    lookup = WeatherLookup(weather, waits.append, clock=clock)
+    with pytest.raises(ProviderRateLimited):
+        lookup.for_request("client", Purpose.CHECKPOINTS, deadline_seconds=30).forecasts(grid(10))
+    assert waits == []
+
+
+def test_a_rate_limit_wait_within_the_deadline_is_taken() -> None:
+    clock = Clock()
+    waits: list[float] = []
+    weather = FakeWeather([ProviderRateLimited("slow down", retry_after_seconds=60)])
+    lookup = WeatherLookup(weather, waits.append, clock=clock)
+    lookup.for_request("client", Purpose.CHECKPOINTS, deadline_seconds=120).forecasts(grid(10))
+    assert len(waits) == 1
+
+
+def budgeted(weather: FakeWeather, per_client: int = 150) -> WeatherLookup:
+    limits = BudgetLimits(
+        per_hour=1000, per_day=2000, per_client_hour=per_client, heatmap_share=0.8
+    )
+    return WeatherLookup(weather, budget=WeatherBudget(limits))
+
+
+def test_over_budget_refuses_before_calling_the_provider() -> None:
+    weather = FakeWeather()
+    with pytest.raises(WeatherBudgetExceeded):
+        budgeted(weather).for_request("client", Purpose.CHECKPOINTS).forecasts(grid(151))
+    assert weather.requests == []
+
+
+def test_cached_cells_cost_nothing() -> None:
+    weather = FakeWeather()
+    lookup = budgeted(weather)
+    positions = grid(100)
+    scoped = lookup.for_request("client", Purpose.CHECKPOINTS)
+    scoped.forecasts(positions)
+    scoped.forecasts(positions)
+    scoped.forecasts(positions + grid(150)[100:])
+    assert sum(len(request) for request in weather.requests) == 150
+
+
+def test_lookup_without_a_scope_is_not_charged() -> None:
+    weather = FakeWeather()
+    assert len(budgeted(weather, per_client=1).forecasts(grid(10))) == 10
+
+
+def test_an_outage_does_not_use_up_the_budget() -> None:
+    weather = FakeWeather([ProviderUnavailable("down"), ProviderUnavailable("down")])
+    scoped = budgeted(weather).for_request("client", Purpose.CHECKPOINTS)
+    with pytest.raises(ProviderUnavailable):
+        scoped.forecasts(grid(150))
+    assert len(scoped.forecasts(grid(150))) == 150
+
+
+def test_only_fetched_locations_stay_charged_after_a_partial_failure() -> None:
+    weather = FakeWeather([None, ProviderUnavailable("down")])
+    lookup = budgeted(weather, per_client=150)
+    scoped = lookup.for_request("client", Purpose.CHECKPOINTS)
+    scoped.forecasts(grid(150))
+    # 100 were fetched, which leaves 50 of the 150. The refused 51 proves those 100 still count.
+    with pytest.raises(WeatherBudgetExceeded):
+        scoped.forecasts([(50.0 + index * 0.1, -90.0) for index in range(51)])
+    assert len(scoped.forecasts([(50.0 + index * 0.1, -90.0) for index in range(50)])) == 50

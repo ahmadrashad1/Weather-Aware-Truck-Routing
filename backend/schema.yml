@@ -118,6 +118,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: ''
+  /api/v1/vitals:
+    post:
+      operationId: vitals_create
+      description: Record how fast the page felt in a real browser. Calls no provider.
+      tags:
+      - vitals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Vital'
+        required: true
+      responses:
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
 components:
   schemas:
     Checkpoint:
@@ -313,6 +340,20 @@ components:
       - label
       - lat
       - lon
+    NameEnum:
+      enum:
+      - CLS
+      - FCP
+      - INP
+      - LCP
+      - TTFB
+      type: string
+      description: |-
+        * `CLS` - CLS
+        * `FCP` - FCP
+        * `INP` - INP
+        * `LCP` - LCP
+        * `TTFB` - TTFB
     NullEnum:
       enum:
       - null
@@ -360,6 +401,16 @@ components:
       - recommended_route_id
       - routes
       - warnings
+    RatingEnum:
+      enum:
+      - good
+      - needs-improvement
+      - poor
+      type: string
+      description: |-
+        * `good` - good
+        * `needs-improvement` - needs-improvement
+        * `poor` - poor
     RiskEnum:
       enum:
       - low
@@ -493,6 +544,22 @@ components:
       - LineString
       type: string
       description: '* `LineString` - LineString'
+    Vital:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/NameEnum'
+        value:
+          type: number
+          format: double
+          maximum: 600000
+          minimum: 0
+        rating:
+          $ref: '#/components/schemas/RatingEnum'
+      required:
+      - name
+      - rating
+      - value
     Weather:
       type: object
       properties:

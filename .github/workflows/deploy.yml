@@ -98,36 +98,13 @@ jobs:
         env:
           SERVER_KNOWN_HOSTS: ${{ vars.SERVER_KNOWN_HOSTS }}
         run: |
-          # Lightsail issues an SSH key and certificate that expire within minutes.
-          keys="$RUNNER_TEMP/ssh"
-          mkdir -m 700 "$keys"
-          aws lightsail get-instance-access-details --instance-name "$INSTANCE" --protocol ssh > "$keys/access.json"
-          jq -r .accessDetails.privateKey "$keys/access.json" > "$keys/key"
-          jq -r .accessDetails.certKey "$keys/access.json" > "$keys/key-cert.pub"
-          user="$(jq -r .accessDetails.username "$keys/access.json")"
-          address="$(jq -r .accessDetails.ipAddress "$keys/access.json")"
-          rm "$keys/access.json"
-          chmod 600 "$keys/key"
-          printf '%s\n' "$SERVER_KNOWN_HOSTS" > "$keys/known_hosts"
-
-          # The firewall change can take a moment to apply.
           # A failed or rolled-back update makes this step fail.
-          ssh_to_server() {
-            ssh -i "$keys/key" -o CertificateFile="$keys/key-cert.pub" \
-              -o UserKnownHostsFile="$keys/known_hosts" -o StrictHostKeyChecking=yes \
-              -o BatchMode=yes -o ConnectTimeout=10 "$user@$address" "$@"
-          }
-          for attempt in $(seq 1 12); do
-            ssh_to_server true && break
-            [ "$attempt" = 12 ] && { echo "::error::Couldn't connect to the server"; exit 1; }
-            sleep 5
-          done
-          if ! ssh_to_server sudo systemctl start truck-routing-update.service; then
-            ssh_to_server sudo journalctl -u truck-routing-update --no-pager -n 40 -o cat || true
+          if ! bash deploy/run-on-server.sh sudo systemctl start truck-routing-update.service; then
+            bash deploy/run-on-server.sh sudo journalctl -u truck-routing-update --no-pager -n 40 -o cat || true
             echo "::error::The update failed on the server, so it rolled back. See docs/deployment.md."
             exit 1
           fi
-          ssh_to_server sudo journalctl -u truck-routing-update --no-pager -n 3 -o cat
+          bash deploy/run-on-server.sh sudo journalctl -u truck-routing-update --no-pager -n 3 -o cat
       - name: Close SSH
         if: always() && env.RUNNER_IP != ''
         run: |

@@ -6,10 +6,17 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from routing.providers.errors import NoRouteFound, ProviderRateLimited, ProviderUnavailable
+from routing.services.weather_budget import Purpose, WeatherBudgetExceeded
 
 logger = logging.getLogger(__name__)
 
 RATE_LIMIT_MESSAGE = "Too many requests right now. Please try again in a minute."
+HEATMAP_QUOTA_MESSAGE = (
+    "Forecast shading is unavailable right now because the weather data limit is close. "
+    "Route risks are not affected."
+)
+CLIENT_QUOTA_MESSAGE = "You've reached the hourly limit for weather checks. Please try again later."
+SHARED_QUOTA_MESSAGE = "The app has reached its limit for weather checks. Please try again later."
 
 
 def error_body(code: str, message: str, fields: Any = None) -> dict[str, Any]:
@@ -25,6 +32,11 @@ def exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
         return Response(
             error_body("no_route", "No truck route connects these locations."),
             status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    if isinstance(exc, WeatherBudgetExceeded):
+        return Response(
+            error_body("quota_exhausted", _quota_message(exc)),
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
         )
     if isinstance(exc, ProviderRateLimited):
         return Response(
@@ -66,6 +78,12 @@ def exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
         error_body("server_error", "Something went wrong. Please try again."),
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )
+
+
+def _quota_message(exc: WeatherBudgetExceeded) -> str:
+    if exc.purpose is Purpose.HEATMAP:
+        return HEATMAP_QUOTA_MESSAGE
+    return CLIENT_QUOTA_MESSAGE if exc.window == "client_hour" else SHARED_QUOTA_MESSAGE
 
 
 def _code_for(exc: Exception) -> str:

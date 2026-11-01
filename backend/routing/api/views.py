@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Any
 
 from django.conf import settings
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -7,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from config.observability import log_event
 from routing.api.serializers import (
     ErrorSerializer,
     GeocodeQuerySerializer,
@@ -15,6 +17,7 @@ from routing.api.serializers import (
     HeatmapResponseSerializer,
     PlanRequestSerializer,
     PlanResponseSerializer,
+    VitalSerializer,
     heatmap_to_response,
     plan_to_response,
 )
@@ -24,7 +27,8 @@ from routing.providers.tomtom import TomTomProvider
 from routing.services.corridor_grid import corridor_points
 from routing.services.heatmap import build_heatmap
 from routing.services.trip_planner import TripRequest, plan_trip
-from routing.services.weather_lookup import WeatherLookup
+from routing.services.weather_budget import BudgetLimits, Purpose, WeatherBudget
+from routing.services.weather_lookup import RequestWeather, WeatherLookup
 
 
 @lru_cache(maxsize=1)
@@ -42,7 +46,20 @@ def get_geocoding_provider() -> GeocodingProvider:
 
 @lru_cache(maxsize=1)
 def get_weather_lookup() -> WeatherLookup:
-    return WeatherLookup(OpenMeteoProvider(settings.OPEN_METEO_API_KEY))
+    return WeatherLookup(
+        OpenMeteoProvider(settings.OPEN_METEO_API_KEY),
+        budget=WeatherBudget(
+            BudgetLimits(
+                **settings.WEATHER_BUDGET_LIMITS,
+                heatmap_share=settings.WEATHER_BUDGET_HEATMAP_SHARE,
+            )
+        ),
+    )
+
+
+def _weather_for(request: Request, purpose: Purpose) -> RequestWeather:
+    # The same client address the rate limits use, which respects NUM_PROXIES.
+    return get_weather_lookup().for_request(ScopedRateThrottle().get_ident(request), purpose)
 
 
 class PlanTripView(APIView):
@@ -72,7 +89,7 @@ class PlanTripView(APIView):
                 interval_miles=data["interval_miles"],
             ),
             get_routing_provider(),
-            get_weather_lookup(),
+            _weather_for(request, Purpose.CHECKPOINTS),
         )
         return Response(PlanResponseSerializer(plan_to_response(plan)).data)
 
@@ -98,7 +115,7 @@ class HeatmapView(APIView):
             corridor_points(data["routes"]),
             data["departure_at"],
             data["load_lb"],
-            get_weather_lookup(),
+            _weather_for(request, Purpose.HEATMAP),
         )
         return Response(HeatmapResponseSerializer(heatmap_to_response(heatmap)).data)
 
@@ -125,6 +142,24 @@ class GeocodeView(APIView):
             for place in places
         ]
         return Response(GeocodeResponseSerializer({"results": results}).data)
+
+
+class VitalsView(APIView):
+    """Record how fast the page felt in a real browser. Calls no provider."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "vitals"
+
+    @extend_schema(
+        request=VitalSerializer,
+        responses={204: None, 400: ErrorSerializer, 429: ErrorSerializer},
+    )
+    def post(self, request: Request) -> Response:
+        serializer = VitalSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        fields: dict[str, Any] = dict(serializer.validated_data)
+        log_event("web_vital", **fields)
+        return Response(status=204)
 
 
 def _place(location: dict[str, object]) -> Place:

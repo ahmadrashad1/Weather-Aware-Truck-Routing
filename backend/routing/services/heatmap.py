@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from routing.services.geometry import LatLon
 from routing.services.risk_engine import assess
-from routing.services.weather_lookup import WeatherLookup, sample_at
+from routing.services.weather_lookup import WeatherSource, sample_at
 
 # The forecast slider runs from hour 0 at departure to hour 48 inclusive.
 HEATMAP_FRAMES = 49
@@ -19,7 +19,7 @@ class Heatmap:
 
 
 def build_heatmap(
-    points: Sequence[LatLon], departure: datetime, load_lb: float, weather: WeatherLookup
+    points: Sequence[LatLon], departure: datetime, load_lb: float, weather: WeatherSource
 ) -> Heatmap:
     forecasts = weather.forecasts(points)
     start = departure.astimezone(UTC)
