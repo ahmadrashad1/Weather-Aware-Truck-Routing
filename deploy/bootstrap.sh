@@ -1,7 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Prepares a new Ubuntu 24.04 Lightsail server. Passed as its launch script, so it runs once as root.
 # The API keys are added separately, and updates start once they exist. See docs/deployment.md.
-set -euo pipefail
+#
+# This must stay plain POSIX sh. Lightsail puts its own `#!/bin/sh` setup in front of a launch
+# script, so its shebang is ignored, and bash features such as `set -o pipefail` stop it at boot.
+set -eu
 
 ROOT=/opt/truck-routing
 REPO_URL=https://github.com/ahmadrashad1/Weather-Aware-Truck-Routing.git

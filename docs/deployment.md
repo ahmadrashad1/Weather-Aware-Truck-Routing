@@ -49,8 +49,8 @@ aws lightsail create-instances \
   --bundle-id micro_3_2 \
   --user-data file://deploy/bootstrap.sh
 
-aws lightsail allocate-static-ip --static-ip-name truck-routing
-aws lightsail attach-static-ip --static-ip-name truck-routing --instance-name truck-routing
+aws lightsail allocate-static-ip --static-ip-name truck-routing-ip
+aws lightsail attach-static-ip --static-ip-name truck-routing-ip --instance-name truck-routing
 ```
 
 The address is the static IP with dots replaced by dashes, so `203.0.113.7` becomes `203-0-113-7.sslip.io`.
