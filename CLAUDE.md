@@ -168,7 +168,8 @@ Never claim a requirement is complete without verifying it.
 - Use `frontend-design` for UI work and `vercel-react-best-practices` for React performance.
 - Use the Context7 and Playwright MCP servers when they are connected.
 - Do not install dozens of unrelated skills. More tools do not automatically mean better implementation.
-- This project produces no video. Do not use the `hyperframes` or `motion-graphics` skills for UI animation.
+- The only video is the short hero clip, made with the `motion-graphics` skill from `videos/hero-routes/`. Live UI motion follows the `apple-design` skill, in code rather than video.
+- Use `apple-design` for UI work alongside `frontend-design`.
 
 <!-- BEGIN AWS Agent Toolkit rules -->
 

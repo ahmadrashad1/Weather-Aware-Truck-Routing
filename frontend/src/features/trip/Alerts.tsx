@@ -15,7 +15,7 @@ function Banner({ children }: { children: React.ReactNode }) {
   return (
     <div
       role="alert"
-      className="rounded-md border-l-4 border-risk-severe bg-white px-3 py-2.5 text-sm"
+      className="rounded-2xl bg-white px-4 py-3 text-sm shadow-[inset_3px_0_0_var(--risk-severe)]"
     >
       {children}
     </div>
@@ -73,7 +73,7 @@ export function Alerts({ plan, error, isPending, onRetry }: AlertsProps) {
         </Banner>
       ) : null}
       {plan.warnings.length > 0 ? (
-        <ul className="grid gap-1.5 rounded-md border-l-4 border-amber bg-white px-3 py-2.5 text-sm">
+        <ul className="grid gap-1.5 rounded-2xl bg-white px-4 py-3 text-sm shadow-[inset_3px_0_0_var(--amber)]">
           {plan.warnings.map((warning) => (
             <li key={warning}>{warning}</li>
           ))}

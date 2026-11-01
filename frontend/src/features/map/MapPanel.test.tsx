@@ -32,6 +32,7 @@ const fake = vi.hoisted(() => ({
   easeTo: vi.fn(),
   contains: vi.fn(() => true),
   setWorkerUrl: vi.fn(),
+  scrollZoom: { enable: vi.fn(), disable: vi.fn() },
 }))
 
 vi.mock('maplibre-gl', () => ({ setWorkerUrl: fake.setWorkerUrl }))
@@ -52,6 +53,7 @@ vi.mock('react-map-gl/maplibre', () => ({
       easeTo: fake.easeTo,
       getBounds: () => ({ contains: fake.contains }),
       getContainer: () => ({ clientHeight: 300 }),
+      getMap: () => ({ scrollZoom: fake.scrollZoom }),
     }))
     return <div data-testid="map">{children}</div>
   },
@@ -218,6 +220,41 @@ describe('MapPanel', () => {
     loadMap()
     const padding = fake.fitBounds.mock.calls[0][1].padding
     expect(padding.bottom).toBeGreaterThan(padding.top)
+  })
+
+  it('leaves room for the planner that floats over the left of a wide map', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({ matches: query.includes('min-width') })),
+    )
+    setup()
+    loadMap()
+    const padding = fake.fitBounds.mock.calls[0][1].padding
+    expect(padding.left).toBeGreaterThan(padding.right)
+  })
+
+  it('lets the wheel scroll the page until the map is fully in view', () => {
+    let report: (entries: { intersectionRatio: number }[]) => void = () => {}
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: typeof report) {
+          report = callback
+        }
+        observe() {}
+        disconnect() {}
+      },
+    )
+    fake.scrollZoom.enable.mockClear()
+    fake.scrollZoom.disable.mockClear()
+    setup()
+    loadMap()
+    expect(fake.scrollZoom.disable).toHaveBeenCalled()
+    act(() => report([{ intersectionRatio: 1 }]))
+    expect(fake.scrollZoom.enable).toHaveBeenCalled()
+    fake.scrollZoom.disable.mockClear()
+    act(() => report([{ intersectionRatio: 0.4 }]))
+    expect(fake.scrollZoom.disable).toHaveBeenCalled()
   })
 
   it('uses even padding on a phone, where the panel sits below the map', () => {

@@ -76,7 +76,6 @@ export function PlaceInput({ label, value, onChange, error }: PlaceInputProps) {
         aria-describedby={error ? errorId : undefined}
         autoComplete="off"
         placeholder="City or address"
-        className="bg-white"
         value={text}
         onChange={(event) => {
           setText(event.target.value)
@@ -94,7 +93,7 @@ export function PlaceInput({ label, value, onChange, error }: PlaceInputProps) {
         </p>
       ) : null}
       {showList ? (
-        <div className="absolute top-full z-20 mt-1 w-full overflow-hidden rounded-md border border-asphalt/20 bg-white shadow-lg">
+        <div className="absolute top-full z-20 mt-1 w-full overflow-hidden rounded-2xl border border-asphalt/20 bg-white shadow-lg">
           <ul id={listId} role="listbox" aria-label={`${label} suggestions`}>
             {places.map((place, index) => (
               <li

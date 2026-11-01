@@ -96,7 +96,7 @@ export function CheckpointDetails({
               aria-expanded={isSelected}
               onClick={() => onSelect(checkpoint.id)}
               className={cn(
-                'flex w-full items-baseline justify-between gap-3 px-2 py-2 text-left text-sm hover:bg-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sign-green',
+                'flex w-full items-baseline justify-between gap-3 px-2 py-2 text-left text-sm hover:bg-white focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action',
                 isSelected && 'bg-white',
               )}
             >

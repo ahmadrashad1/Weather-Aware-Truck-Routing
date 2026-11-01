@@ -55,11 +55,12 @@ const ATTRIBUTION = {
     '<a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather data by Open-Meteo.com</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>)',
 }
 const FIT_PADDING = 60
-// Room for the forecast panel, which floats over the bottom of the map on a wide screen.
-const WIDE_SCREEN_FIT_PADDING = { top: 60, left: 60, right: 60, bottom: 190 }
+// Room for the planner and forecast panels, which float over the map on a wide screen.
+const WIDE_SCREEN_FIT_PADDING = { top: 70, left: 480, right: 60, bottom: 190 }
 const FIT_MAX_ZOOM = 11
 const PHONE_POPUP_OFFSET_SHARE = 0.35
 const ANIMATION_MS = 700
+const FULLY_IN_VIEW = 0.95
 const INTERACTIVE_LAYERS = [CHECKPOINT_LAYER, ROUTE_HIT_LAYER]
 
 function animationMs(): number {
@@ -145,6 +146,24 @@ function MapPanel({
     }
   }, [selectedCheckpoint, isLoaded])
 
+  // Until the map is fully in view, the wheel scrolls the page, or a map rising under the pointer
+  // would capture the scroll and start zooming halfway up the screen.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!isLoaded || !map || typeof IntersectionObserver !== 'function') return
+    const { scrollZoom } = map.getMap()
+    scrollZoom.disable()
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.intersectionRatio >= FULLY_IN_VIEW) scrollZoom.enable()
+        else scrollZoom.disable()
+      },
+      { threshold: [FULLY_IN_VIEW] },
+    )
+    observer.observe(map.getContainer())
+    return () => observer.disconnect()
+  }, [isLoaded])
+
   function handleClick(event: MapLayerMouseEvent) {
     const features = event.features ?? []
     const checkpoint = features.find((f) => layerOf(f, CHECKPOINT_LAYER))
@@ -205,11 +224,11 @@ function MapPanel({
                 aria-label={`Select route ${route.rank}`}
                 onClick={() => onSelectRoute(route.id)}
                 className={cn(
-                  'rounded-sm px-1.5 py-0.5 text-xs font-bold whitespace-nowrap shadow-sm focus-visible:outline-3 focus-visible:outline-amber',
+                  'pressable rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap shadow-sm focus-visible:outline-3 focus-visible:outline-action',
                   isRecommended
-                    ? 'bg-sign-green text-white'
+                    ? 'bg-action text-white'
                     : 'bg-white text-asphalt',
-                  route.id === selectedRouteId && 'ring-2 ring-amber',
+                  route.id === selectedRouteId && 'ring-2 ring-asphalt',
                 )}
               >
                 Route {route.rank}
@@ -235,7 +254,7 @@ function MapPanel({
       {baseMapFailed ? (
         <p
           role="status"
-          className="absolute bottom-2 left-2 z-10 rounded-md bg-white/95 px-2.5 py-1.5 text-xs shadow-sm"
+          className="material absolute bottom-3 left-3 z-10 rounded-2xl px-3 py-1.5 text-xs lg:left-[27.5rem]"
         >
           The background map could not load. Routes and checkpoints still show.
         </p>

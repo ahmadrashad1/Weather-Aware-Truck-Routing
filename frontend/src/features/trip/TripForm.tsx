@@ -97,7 +97,6 @@ export function TripForm({ onSubmit, isPending, error }: TripFormProps) {
           <Input
             id="departure"
             type="datetime-local"
-            className="bg-white"
             value={departure}
             aria-invalid={Boolean(errors.departure_at)}
             onChange={(event) => setDeparture(event.target.value)}
@@ -116,7 +115,6 @@ export function TripForm({ onSubmit, isPending, error }: TripFormProps) {
             inputMode="numeric"
             min={0}
             step={500}
-            className="bg-white"
             value={load}
             aria-invalid={Boolean(errors.load_lb)}
             onChange={(event) => setLoad(event.target.value)}
@@ -137,11 +135,20 @@ export function TripForm({ onSubmit, isPending, error }: TripFormProps) {
         <legend className="mb-1.5 text-sm leading-none font-medium">
           Weather check every
         </legend>
-        <div className="grid grid-cols-3 overflow-hidden rounded-md border border-asphalt/25 bg-white">
+        <div className="relative grid grid-cols-3 rounded-xl bg-asphalt/5 p-0.5">
+          {/* One thumb that slides, as on a segmented control, rather than a colour swap. */}
+          <span
+            aria-hidden
+            data-testid="interval-thumb"
+            className="absolute inset-y-0.5 left-0.5 w-[calc((100%-0.25rem)/3)] rounded-[0.625rem] bg-white shadow-[0_1px_4px_rgb(0_0_0/0.16)] transition-transform duration-300 ease-[var(--ease-settle)] motion-reduce:transition-none"
+            style={{
+              transform: `translateX(${INTERVALS.indexOf(interval) * 100}%)`,
+            }}
+          />
           {INTERVALS.map((value) => (
             <label
               key={value}
-              className="cursor-pointer border-l border-asphalt/25 py-2 text-center text-sm font-medium first:border-l-0 has-checked:bg-asphalt has-checked:text-white has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-sign-green"
+              className="relative cursor-pointer rounded-[0.625rem] py-2 text-center text-sm font-medium has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-action"
             >
               <input
                 type="radio"
@@ -157,7 +164,7 @@ export function TripForm({ onSubmit, isPending, error }: TripFormProps) {
         </div>
       </fieldset>
 
-      <Button type="submit" disabled={isPending} className="h-11 text-base">
+      <Button type="submit" disabled={isPending} className="h-12 text-base">
         {isPending ? 'Planning routes' : 'Plan routes'}
       </Button>
     </form>

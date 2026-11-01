@@ -113,6 +113,13 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - Six heavy requests run at once per worker, and more get a `busy` error rather than queueing — this keeps threads free for searches and health checks — cost if wrong: the limit hasn't been reached in a load test, so it could refuse trips the server could have handled.
 - The load test uses invented routes, not recorded ones — TomTom's terms don't allow storing its results — cost if wrong: real route shapes could cost more or less CPU.
 - Redis and more workers are an optional overlay, not switched on — the load test stopped before comparing them, and they use memory on a small server — cost if wrong: one worker's CPU remains the limit until someone turns the overlay on.
+- The page opens on a hero with a parallax scroll, and the planner is the next screen — requested for the UI update — cost if wrong: every test and visitor now scrolls past it to reach the planner.
+- Parallax is written directly to the layers on each scroll frame, with no animation library — it adds nothing to the bundle and never re-renders React, which keeps the map smooth — cost if wrong: future gesture-driven springs would still need a library.
+- The hero film is a rendered clip with no text, and the headline is real page text — text stays sharp and accessible, and doesn't wait for video — cost if wrong: 256 KB more on first load (111 KB for browsers that take the MP4).
+- The film's checkpoint colours are illustrative, not weather — it plays before any trip exists — cost if wrong: someone could read it as a real forecast, so it carries no place names or numbers.
+- Reduced motion and data saving get a still image and no parallax — the skill's accessibility rule — cost if wrong: none.
+- The system font replaces Overpass, and blue replaces the highway-sign green as the action colour — Apple's guidance is to use the platform font, and blue stays clear of the risk colours on the map — cost if wrong: the app looks a little less distinctive, and differs slightly by device.
+- The map's wheel zoom stays off until it's at least 95% in view — otherwise a map rising under the pointer captures the scroll partway up the screen — cost if wrong: a slightly short map can't zoom by wheel until it's scrolled into place.
 
 ## Known minor issues, left as they are
 
