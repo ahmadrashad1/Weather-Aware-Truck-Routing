@@ -175,6 +175,10 @@ Other choices made along the way:
 
 Forecasts are cached in the app's memory for an hour by location, on a grid of about 3.5 miles, so a restart or update empties the cache. Each IP can make 30 plans and 30 heatmaps an hour, and 120 place searches a minute. Each IP can also fetch 1,500 new forecast locations an hour, and the whole app stays under Open-Meteo's free limits. See [docs/deployment.md](docs/deployment.md#quota-protection).
 
+## Load testing
+
+[docs/load-testing.md](docs/load-testing.md) covers how to test capacity without spending provider quota or touching production.
+
 ## Deploying
 
 The app runs on one Amazon Lightsail server for $7 a month. After CI passes on `main`, GitHub publishes new images, signs in to AWS through GitHub OIDC, and updates the server, which rolls back if the new version isn't healthy. GitHub stores no AWS keys. [docs/deployment.md](docs/deployment.md) covers how it works, how to set up a server, and how to operate it.

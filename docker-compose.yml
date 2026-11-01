@@ -5,6 +5,9 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
       TOMTOM_API_KEY: ${TOMTOM_API_KEY:?Set TOMTOM_API_KEY in .env}
       OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+      REDIS_URL: ${REDIS_URL:-}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-8}
       # The internal names are for the frontend's proxy and the health check below.
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost},127.0.0.1,backend
       NUM_PROXIES: ${NUM_PROXIES:-1}

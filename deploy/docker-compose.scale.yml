@@ -1,0 +1,20 @@
+# Optional: a shared cache and more workers, for when one worker's CPU is the limit. A deploy keeps
+# the cache, because Redis outlives the app's restart. See docs/load-testing.md for what it gains.
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}

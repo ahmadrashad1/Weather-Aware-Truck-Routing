@@ -36,6 +36,8 @@ NO_STORE = "no-store"
 
 @lru_cache(maxsize=1)
 def _tomtom() -> TomTomProvider:
+    if settings.PROVIDER_STUB_URL:
+        return TomTomProvider(settings.TOMTOM_API_KEY, base_url=settings.PROVIDER_STUB_URL)
     return TomTomProvider(settings.TOMTOM_API_KEY)
 
 
@@ -54,7 +56,7 @@ def get_attribution_provider() -> AttributionProvider:
 @lru_cache(maxsize=1)
 def get_weather_lookup() -> WeatherLookup:
     return WeatherLookup(
-        OpenMeteoProvider(settings.OPEN_METEO_API_KEY),
+        OpenMeteoProvider(settings.OPEN_METEO_API_KEY, base_url=settings.PROVIDER_STUB_URL or None),
         budget=WeatherBudget(
             BudgetLimits(
                 **settings.WEATHER_BUDGET_LIMITS,

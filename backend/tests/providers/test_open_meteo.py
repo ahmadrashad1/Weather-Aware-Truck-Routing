@@ -226,3 +226,11 @@ def test_rain_on_the_no_travel_boundary_is_not_pushed_over_by_float_error(
     body = location(rain=[0.1, 0.0], showers=[25.3, 0.0])
     mocked.get(FREE_URL).mock(httpx.Response(200, json=body))
     assert provider.hourly([DENVER])[DENVER].rain_in_hr[0] == 1.0
+
+
+def test_a_base_url_replaces_the_real_host(respx_mock: respx.MockRouter) -> None:
+    route = respx_mock.get("http://stub:9000/v1/forecast").mock(httpx.Response(500))
+    provider = OpenMeteoProvider(retry_delay_seconds=0, base_url="http://stub:9000")
+    with pytest.raises(ProviderUnavailable):
+        provider.hourly([DENVER])
+    assert route.called

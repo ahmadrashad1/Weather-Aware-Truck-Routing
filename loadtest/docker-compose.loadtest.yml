@@ -1,0 +1,12 @@
+# Added on top of docker-compose.yml on a temporary server. Plain HTTP, with published images and
+# the stand-in providers. See docs/load-testing.md.
+services:
+  backend:
+    image: ghcr.io/ahmadrashad1/weather-aware-truck-routing/backend:${IMAGE_TAG:?Set IMAGE_TAG}
+    environment:
+      PROVIDER_STUB_URL: ${PROVIDER_STUB_URL:?Set PROVIDER_STUB_URL}
+      DJANGO_SECURE_SSL_REDIRECT: "false"
+      APP_VERSION: load-test
+
+  frontend:
+    image: ghcr.io/ahmadrashad1/weather-aware-truck-routing/frontend:${IMAGE_TAG:?Set IMAGE_TAG}

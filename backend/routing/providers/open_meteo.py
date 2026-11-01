@@ -32,8 +32,10 @@ class OpenMeteoProvider:
         api_key: str = "",
         client: httpx.Client | None = None,
         retry_delay_seconds: float = DEFAULT_RETRY_DELAY_SECONDS,
+        base_url: str | None = None,
     ) -> None:
         self._api_key = api_key
+        self._url = f"{base_url}/v1/forecast" if base_url else PAID_URL if api_key else FREE_URL
         self._client = client or httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
         self._retry_delay_seconds = retry_delay_seconds
 
@@ -58,7 +60,7 @@ class OpenMeteoProvider:
             params["apikey"] = self._api_key
         response = get_with_retries(
             self._client,
-            PAID_URL if self._api_key else FREE_URL,
+            self._url,
             params,
             "Open-Meteo",
             self._retry_delay_seconds,

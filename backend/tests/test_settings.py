@@ -24,6 +24,7 @@ ENV_NAMES = (
     "NUM_PROXIES",
     "DJANGO_SECURE_SSL_REDIRECT",
     "APP_VERSION",
+    "PROVIDER_STUB_URL",
 )
 PRODUCTION = {
     "DJANGO_SECRET_KEY": "a-long-random-production-secret-key-that-is-at-least-fifty-characters",
@@ -185,3 +186,30 @@ def test_the_budget_stays_under_open_meteos_free_limits() -> None:
     limits = settings.WEATHER_BUDGET_LIMITS
     assert limits["per_hour"] < 5_000
     assert limits["per_day"] < 10_000
+
+
+STUB = {"PROVIDER_STUB_URL": "http://stub:9000", "DJANGO_SECURE_SSL_REDIRECT": "false"}
+
+
+def test_production_has_no_provider_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert load_settings(monkeypatch, **PRODUCTION).PROVIDER_STUB_URL == ""
+
+
+def test_a_stub_refuses_to_start_on_an_https_stack(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The production overlay turns HTTPS redirects on, so a stub there stops the app from starting.
+    with pytest.raises(ImproperlyConfigured, match="PROVIDER_STUB_URL"):
+        load_settings(monkeypatch, **PRODUCTION, PROVIDER_STUB_URL="http://stub:9000")
+
+
+def test_a_stub_lifts_limits_so_they_do_not_hide_the_servers_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(monkeypatch, **PRODUCTION, **STUB)
+    assert settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["trip_plan"] == "1000000/hour"
+    assert settings.WEATHER_BUDGET_LIMITS["per_client_hour"] > 1_000_000
+
+
+def test_limits_stay_in_place_without_a_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = load_settings(monkeypatch, **PRODUCTION)
+    assert settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["trip_plan"] == "30/hour"
+    assert settings.WEATHER_BUDGET_LIMITS["per_client_hour"] == 1_500

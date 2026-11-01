@@ -19,4 +19,4 @@ EXPOSE 8000
 # Threads and a long timeout because a request can wait out a provider's per-minute rate limit.
 # One worker, because the in-process cache and its rate limit counts aren't shared between them.
 # No access log, because Django logs each request without its search text.
-CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --workers 1 --worker-class gthread --threads 8 --timeout 150"]
+CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --workers ${GUNICORN_WORKERS:-1} --worker-class gthread --threads ${GUNICORN_THREADS:-8} --timeout 150"]
