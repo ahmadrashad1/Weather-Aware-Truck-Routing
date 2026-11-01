@@ -60,7 +60,9 @@ An independent review of the whole project found and fixed five issues, recorded
 | Hosted application | Live at <https://3-24-117-219.sslip.io>. Checked with a real browser at desktop and mobile widths, including canvas clicks, with no console errors. |
 | Long trips work through the full path | New York to Los Angeles at 10-mile sampling: 83s for routes and 88s with the heatmap. |
 | Fits the server | The same trip peaked at 583 MB of 909 MB, with 14 MB of swap and no container restarts. |
-| Deploys through GitHub OIDC | See the `Deploy` workflow. A workflow without the `production` environment is refused by AWS, and a non-main branch is refused the environment. |
+| Deploys through GitHub OIDC | A merge to `main` signed in to AWS, updated the server, closed port 22 and confirmed the new version on the public site. |
+| Only `main` can use the role | From a test branch, AWS refused a job without the `production` environment, and GitHub refused the branch that environment. |
+| The role's permissions are narrow | IAM simulation allows its three actions on this server, and denies creating or deleting servers, IAM changes and S3. |
 | Forged headers are ignored | A forged `X-Forwarded-For` didn't reach the app. |
 
 ## Engineering rules
