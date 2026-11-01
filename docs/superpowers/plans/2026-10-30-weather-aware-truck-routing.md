@@ -640,6 +640,10 @@ Message: `docs: add README, deployment guide and Loom checklist`
 
 ---
 
+### Task 13: Deployment on Lightsail
+
+Added after Task 12. **Files:** `deploy/`, `.github/workflows/deploy.yml`, `docs/deployment.md`. Test: `backend/tests/test_deploy_update.py`. See `docs/deployment.md` for the design and `docs/decisions.md` for the reasoning. This task supersedes the "CI only" constraint above.
+
 ## Open items for the user
 
 - **`TOMTOM_API_KEY`** is needed before Task 5 Step 1. TomTom's store page lists a free commercial-friendly tier with no card, but sources disagree on the current quota.

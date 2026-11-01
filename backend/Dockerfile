@@ -9,10 +9,13 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 RUN useradd --system --create-home app
 USER app
 
 ENV PATH="/app/.venv/bin:$PATH" PORT=8000
 EXPOSE 8000
 # Threads and a long timeout because a request can wait out a provider's per-minute rate limit.
-CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --worker-class gthread --threads 8 --timeout 150 --access-logfile -"]
+# One worker, because the in-process cache and its rate limit counts aren't shared between them.
+CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --workers 1 --worker-class gthread --threads 8 --timeout 150 --access-logfile -"]

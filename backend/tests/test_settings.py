@@ -23,12 +23,12 @@ ENV_NAMES = (
     "REDIS_URL",
     "NUM_PROXIES",
     "DJANGO_SECURE_SSL_REDIRECT",
+    "APP_VERSION",
 )
 PRODUCTION = {
     "DJANGO_SECRET_KEY": "a-long-random-production-secret-key-that-is-at-least-fifty-characters",
     "ALLOWED_HOSTS": "app.example.com",
     "TOMTOM_API_KEY": "tomtom-key",
-    "REDIS_URL": "redis://127.0.0.1:6379/0",
 }
 
 
@@ -64,6 +64,24 @@ def test_production_starts_with_every_required_setting(monkeypatch: pytest.Monke
     settings = load_settings(monkeypatch, **PRODUCTION)
     assert settings.DEBUG is False
     assert settings.ALLOWED_HOSTS == ["app.example.com"]
+
+
+def test_production_caches_in_process_without_redis(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Rate limits read the cache, so production needs one even with no Redis.
+    settings = load_settings(monkeypatch, **PRODUCTION)
+    assert "locmem" in settings.CACHES["default"]["BACKEND"]
+
+
+def test_the_in_process_cache_is_bounded_for_a_small_server(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # About 20 KB a forecast, and Open-Meteo's hourly limit is 5,000 locations.
+    settings = load_settings(monkeypatch, **PRODUCTION)
+    assert settings.CACHES["default"]["OPTIONS"]["MAX_ENTRIES"] <= 5_000
+
+
+def test_redis_is_used_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = load_settings(monkeypatch, **PRODUCTION, REDIS_URL="redis://127.0.0.1:6379/0")
     assert settings.CACHES["default"]["BACKEND"] == "config.cache.ResilientRedisCache"
 
 
@@ -116,6 +134,12 @@ def test_a_declared_proxy_is_trusted_for_client_ip_and_scheme(
     settings = load_settings(monkeypatch, **PRODUCTION, NUM_PROXIES="2")
     assert settings.REST_FRAMEWORK["NUM_PROXIES"] == 2
     assert settings.SECURE_PROXY_SSL_HEADER == ("HTTP_X_FORWARDED_PROTO", "https")
+
+
+def test_version_comes_from_the_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert load_settings(monkeypatch, **PRODUCTION).APP_VERSION == "dev"
+    settings = load_settings(monkeypatch, **PRODUCTION, APP_VERSION="abc123")
+    assert settings.APP_VERSION == "abc123"
 
 
 def test_debug_needs_no_production_settings(monkeypatch: pytest.MonkeyPatch) -> None:
