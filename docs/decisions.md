@@ -120,6 +120,8 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - Reduced motion and data saving get a still image and no parallax — the skill's accessibility rule — cost if wrong: none.
 - The system font replaces Overpass, and blue replaces the highway-sign green as the action colour — Apple's guidance is to use the platform font, and blue stays clear of the risk colours on the map — cost if wrong: the app looks a little less distinctive, and differs slightly by device.
 - The map's wheel zoom stays off until it's at least 95% in view — otherwise a map rising under the pointer captures the scroll partway up the screen — cost if wrong: a slightly short map can't zoom by wheel until it's scrolled into place.
+- Alert emails go through Resend from a GitHub workflow — requested, and Lightsail alarms can't call Resend directly — cost if wrong: alerts can lag by the 15-minute check plus any GitHub delay, and stop if GitHub pauses the schedule.
+- The hint under the map only shows on wide screens — requested, because on a phone the form is right below the map — cost if wrong: none.
 
 ## Known minor issues, left as they are
 

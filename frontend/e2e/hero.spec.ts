@@ -84,3 +84,12 @@ test('the title uses large, tight system type', async ({ page }) => {
   expect(style.fontWeight).toBe('600')
   expect(parseFloat(style.letterSpacing)).toBeLessThan(0)
 })
+
+test('only wide screens show the hint under the map', async ({
+  page,
+}, info) => {
+  const hint = page.getByText('Enter a trip to compare three routes')
+  await page.getByRole('link', { name: 'Plan a trip' }).click()
+  if (info.project.name === 'mobile') await expect(hint).toBeHidden()
+  else await expect(hint).toBeVisible()
+})

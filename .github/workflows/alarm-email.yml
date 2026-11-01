@@ -1,0 +1,56 @@
+name: Alarm email
+
+# Emails through Resend when a server alarm starts or stops firing. Off until the setup in
+# docs/deployment.md is done, so it can't fail on a schedule before then.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: vars.ALERTS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    # The AWS role trusts this environment only, and the environment only allows main.
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      INSTANCE: truck-routing
+      STATE_FILE: ${{ github.workspace }}/.alarm-state
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remember the last alarm states
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STATE_FILE }}
+          key: alarm-state-${{ github.run_id }}
+          restore-keys: alarm-state-
+      - name: Sign in to AWS through OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: alarms-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: ap-southeast-2
+      - name: Email any change
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          ALERT_FROM: ${{ vars.ALERT_FROM }}
+        run: |
+          before="$(cat "$STATE_FILE" 2>/dev/null || true)"
+          bash deploy/check-alarms.sh "$STATE_FILE"
+          if [ "$before" != "$(cat "$STATE_FILE")" ]; then
+            echo "CHANGED=true" >> "$GITHUB_ENV"
+          fi
+      - name: Save the new alarm states
+        if: env.CHANGED == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.STATE_FILE }}
+          key: alarm-state-${{ github.run_id }}
