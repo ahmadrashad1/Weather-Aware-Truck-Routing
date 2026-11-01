@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useState } from 'react'
 
 import type { PlanRequest } from '@/api/client'
 import { useHeatmap, usePlanTrip } from '@/api/queries'
+import { DataCredit } from '@/components/DataCredit'
 import { ForecastSlider } from '@/features/forecast/ForecastSlider'
 import { forecastStore } from '@/features/forecast/forecastStore'
 import { MapErrorBoundary } from '@/features/map/MapErrorBoundary'
@@ -67,6 +68,7 @@ function App() {
         <h1 className="text-2xl leading-tight font-bold">
           Weather-Aware Truck Routing
         </h1>
+        <DataCredit />
         <TripForm
           onSubmit={submit}
           isPending={planTrip.isPending}

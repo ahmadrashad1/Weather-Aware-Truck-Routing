@@ -49,7 +49,11 @@ const BLANK_MAP_STYLE: StyleSpecification = {
 }
 const CONTINENTAL_US = { longitude: -98, latitude: 39, zoom: 3.4 }
 const MAP_STYLE = { width: '100%', height: '100%' }
-const COMPACT_ATTRIBUTION = { compact: true }
+const ATTRIBUTION = {
+  compact: true,
+  customAttribution:
+    '<a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather data by Open-Meteo.com</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>)',
+}
 const FIT_PADDING = 60
 // Room for the forecast panel, which floats over the bottom of the map on a wide screen.
 const WIDE_SCREEN_FIT_PADDING = { top: 60, left: 60, right: 60, bottom: 190 }
@@ -160,7 +164,7 @@ function MapPanel({
         initialViewState={CONTINENTAL_US}
         mapStyle={baseMapFailed ? BLANK_MAP_STYLE : BASE_MAP_STYLE}
         style={MAP_STYLE}
-        attributionControl={COMPACT_ATTRIBUTION}
+        attributionControl={ATTRIBUTION}
         interactiveLayerIds={plan ? INTERACTIVE_LAYERS : []}
         onLoad={() => setIsLoaded(true)}
         onError={(event) => {

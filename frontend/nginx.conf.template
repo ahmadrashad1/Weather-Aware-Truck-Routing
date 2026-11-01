@@ -11,7 +11,10 @@ server {
 
   gzip on;
   gzip_vary on;
+  gzip_comp_level 5;
   gzip_min_length 1024;
+  # Caddy adds a Via header, and nginx doesn't compress requests carrying one unless told to.
+  gzip_proxied any;
   gzip_types text/javascript application/javascript text/css application/json image/svg+xml;
 
   # Built files have a content hash in their name, so they can be cached for good.
