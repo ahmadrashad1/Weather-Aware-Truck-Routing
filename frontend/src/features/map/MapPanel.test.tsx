@@ -275,9 +275,14 @@ describe('MapPanel', () => {
     expect(radius[6]).toEqual(['case', selected, 6, 3])
   })
 
-  it('collapses the attribution so it fits a small map', () => {
+  it('collapses the attribution to fit a small map, and credits the weather data', () => {
     setup()
-    expect(fake.mapProps.attributionControl).toEqual({ compact: true })
+    expect(fake.mapProps.attributionControl).toEqual({
+      compact: true,
+      customAttribution: expect.stringContaining(
+        'Weather data by Open-Meteo.com',
+      ),
+    })
   })
 
   it('makes checkpoints and route lines clickable', () => {

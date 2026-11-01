@@ -99,6 +99,7 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - A failed deploy rolls back automatically and isn't retried until a newer commit is published — a bad release shouldn't loop or leave the app down — cost if wrong: a failure caused by a brief outage needs a new commit or a manual redeploy.
 - Redis is removed from the deployed stack, with the cache in the app's process, limited to 5,000 entries, and one worker — the user chose to drop caching infrastructure while there are no users, and rate limits still need a cache — cost if wrong: an empty cache after each update; adding `REDIS_URL` brings Redis back.
 - ALLOWED_HOSTS is still required in production, and `REDIS_URL` no longer is — a server with no Redis must still start — cost if wrong: none.
+- The data credit sits under the page title and in the map's attribution — Open-Meteo's licence asks for it next to wherever its data appears, and the map's control collapses on small screens or after a drag — cost if wrong: a line of text to move. TomTom is credited too, but its exact attribution terms haven't been confirmed.
 
 ## Known minor issues, left as they are
 

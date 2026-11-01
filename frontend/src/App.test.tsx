@@ -77,6 +77,22 @@ describe('App', () => {
     vi.unstubAllGlobals()
   })
 
+  it('credits the data providers and links the weather licence', () => {
+    renderWithQueries(<App />)
+    expect(
+      screen.getByRole('link', { name: 'Weather data by Open-Meteo.com' }),
+    ).toHaveAttribute('href', 'https://open-meteo.com/')
+    expect(screen.getByRole('link', { name: 'CC BY 4.0' })).toHaveAttribute(
+      'href',
+      'https://creativecommons.org/licenses/by/4.0/',
+    )
+    expect(screen.getByText(/used to calculate risk levels/)).toBeVisible()
+    expect(screen.getByRole('link', { name: 'TomTom' })).toHaveAttribute(
+      'href',
+      'https://www.tomtom.com/',
+    )
+  })
+
   it('renders the heading', () => {
     renderWithQueries(<App />)
     expect(

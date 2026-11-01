@@ -100,6 +100,8 @@ jobs:
         run: |
           script=$(curl -fsS http://127.0.0.1:8080/ | grep -o 'assets/[^"]*\.js' | head -1)
           curl -fsSI -H 'Accept-Encoding: gzip' "http://127.0.0.1:8080/$script" | grep -i '^content-encoding: gzip'
+          # In production Caddy adds a Via header, and nginx skips compression for those by default.
+          curl -fsSI -H 'Accept-Encoding: gzip' -H 'Via: 1.1 Caddy' "http://127.0.0.1:8080/$script" | grep -i '^content-encoding: gzip'
       - name: Show logs after a failure
         if: failure()
         run: docker compose logs
