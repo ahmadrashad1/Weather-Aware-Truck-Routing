@@ -118,7 +118,7 @@ function App() {
             </Suspense>
           </MapErrorBoundary>
           {plan ? null : (
-            <p className="pointer-events-none absolute right-0 bottom-8 left-0 mx-auto w-fit max-w-[90%] rounded-md bg-white/95 px-3 py-1.5 text-center text-sm shadow-sm">
+            <p className="pointer-events-none absolute right-0 bottom-20 left-0 lg:bottom-8 mx-auto w-fit max-w-[90%] rounded-md bg-white/95 px-3 py-1.5 text-center text-sm shadow-sm">
               Enter a trip to compare three routes by weather risk.
             </p>
           )}
