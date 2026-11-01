@@ -23,7 +23,6 @@ export const HeatmapLayer = memo(function HeatmapLayer({
     () => ({
       'circle-color': heatmapColor(forecastStore.get()),
       'circle-blur': 1,
-      'circle-opacity': 0.6,
       // Roughly a constant distance on the ground, so shading doesn't change as you zoom.
       'circle-radius': [
         'interpolate',

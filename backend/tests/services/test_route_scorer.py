@@ -7,6 +7,7 @@ from routing.services.checkpoint_generator import Checkpoint
 from routing.services.route_scorer import (
     AssessedCheckpoint,
     RouteScore,
+    explain_rank,
     rank_routes,
     score_route,
 )
@@ -188,3 +189,62 @@ def test_route_with_no_known_weather_is_not_recommended() -> None:
 def test_ranking_no_routes_rejected() -> None:
     with pytest.raises(ValueError):
         rank_routes({})
+
+
+def test_fewer_unknown_miles_outrank_a_cleaner_looking_partial_route() -> None:
+    # Nearly all of A is unknown, so its zero Severe miles say almost nothing.
+    result = rank_routes(
+        {
+            "a": score(unknown=95, average=0.0),
+            "b": score(unknown=5, severe=50, average=1.5),
+        }
+    )
+    assert result.ordered_ids == ["b", "a"]
+    assert result.recommended_id == "b"
+
+
+def test_a_route_with_no_known_weather_ranks_after_a_partly_known_one() -> None:
+    result = rank_routes(
+        {
+            "none": score(unknown=100, average=None),
+            "some": score(unknown=90, severe=10, average=3.0),
+        }
+    )
+    assert result.ordered_ids == ["some", "none"]
+    assert result.recommended_id == "some"
+
+
+def test_average_risk_ties_at_the_precision_people_see() -> None:
+    # 0.0251 and 0.0254 both show as 0.025, so travel time must decide.
+    result = rank_routes(
+        {"a": score(average=0.0251, duration=7200), "b": score(average=0.0254, duration=3600)}
+    )
+    assert result.ordered_ids == ["b", "a"]
+
+
+def test_rationale_against_a_no_travel_route_names_no_travel() -> None:
+    text = explain_rank(score(), score(no_travel=200), recommended=True)
+    assert "No Travel" in text
+    assert "missing" not in text
+
+
+def test_rationale_against_a_route_with_missing_weather_names_it() -> None:
+    text = explain_rank(score(), score(unknown=40), recommended=True)
+    assert "complete weather" in text
+    assert "40 mi" in text
+
+
+def test_rationale_shows_average_risks_that_actually_differ() -> None:
+    text = explain_rank(score(average=0.025), score(average=0.031), recommended=True)
+    assert "0.025 vs 0.031" in text
+
+
+def test_rationale_for_a_lower_route_against_a_cleaner_one() -> None:
+    text = explain_rank(score(severe=5), score(severe=0), recommended=False)
+    assert text == "Ranks lower for more Severe miles (5.0 vs 0.0)."
+
+
+def test_rationale_for_the_most_complete_of_two_partial_routes() -> None:
+    text = explain_rank(score(unknown=5, severe=50), score(unknown=95), recommended=True)
+    assert "complete" in text
+    assert "5 mi" in text and "95 mi" in text

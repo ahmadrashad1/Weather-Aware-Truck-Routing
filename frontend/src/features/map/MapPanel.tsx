@@ -1,6 +1,10 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-import { setWorkerUrl, type MapGeoJSONFeature } from 'maplibre-gl'
+import {
+  setWorkerUrl,
+  type MapGeoJSONFeature,
+  type StyleSpecification,
+} from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -31,6 +35,18 @@ import { RouteLayers } from './RouteLayers'
 setWorkerUrl(workerUrl)
 
 const BASE_MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
+// Routes can only be drawn once a style has loaded, so this stands in if the base map's style fails.
+const BLANK_MAP_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {},
+  layers: [
+    {
+      id: 'background',
+      type: 'background',
+      paint: { 'background-color': '#eef0ec' },
+    },
+  ],
+}
 const CONTINENTAL_US = { longitude: -98, latitude: 39, zoom: 3.4 }
 const MAP_STYLE = { width: '100%', height: '100%' }
 const COMPACT_ATTRIBUTION = { compact: true }
@@ -142,12 +158,15 @@ function MapPanel({
       <MapView
         ref={mapRef}
         initialViewState={CONTINENTAL_US}
-        mapStyle={BASE_MAP_STYLE}
+        mapStyle={baseMapFailed ? BLANK_MAP_STYLE : BASE_MAP_STYLE}
         style={MAP_STYLE}
         attributionControl={COMPACT_ATTRIBUTION}
         interactiveLayerIds={plan ? INTERACTIVE_LAYERS : []}
         onLoad={() => setIsLoaded(true)}
-        onError={() => setBaseMapFailed(true)}
+        onError={(event) => {
+          // A failed tile only leaves a gap. With no style, nothing can be drawn at all.
+          if (!event.target.getStyle()?.layers?.length) setBaseMapFailed(true)
+        }}
         onClick={handleClick}
         onMouseEnter={(event) => {
           event.target.getCanvas().style.cursor = 'pointer'

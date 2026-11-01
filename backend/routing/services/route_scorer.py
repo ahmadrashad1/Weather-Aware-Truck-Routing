@@ -7,9 +7,10 @@ from routing.domain import RiskAssessment, RiskLevel, WeatherSample
 from routing.services.checkpoint_generator import Checkpoint
 
 MILES_DECIMALS = 2
-AVERAGE_RISK_DECIMALS = 4
+# The same precision the API shows, so two routes that look tied are treated as tied.
+AVERAGE_RISK_DECIMALS = 3
 
-RankKey = tuple[bool, bool, float, float, float, float, int]
+RankKey = tuple[bool, bool, bool, float, float, float, float, float, int]
 
 
 @dataclass(frozen=True)
@@ -68,13 +69,17 @@ def score_route(checkpoints: Sequence[AssessedCheckpoint], duration_seconds: int
 def rank_key(score: RouteScore) -> RankKey:
     """Order routes strictly: never a weighted score.
 
-    Routes with No Travel or unknown miles go last, then the assessment's order applies. Rounding
-    stops floating-point noise from deciding a tie that a lower priority should break.
+    Routes with No Travel miles go last, then routes with no known weather, then routes with some
+    unknown miles, most complete first, because a route's unknown miles can hide anything. After
+    that the assessment's order applies. Rounding stops floating-point noise from deciding a tie
+    that a lower priority should break.
     """
     return (
         score.no_travel_miles > 0,
+        score.average_risk is None,
         score.unknown_miles > 0,
         round(score.no_travel_miles, MILES_DECIMALS),
+        round(score.unknown_miles, MILES_DECIMALS),
         round(score.severe_miles, MILES_DECIMALS),
         round(score.high_miles, MILES_DECIMALS),
         round(score.average_risk, AVERAGE_RISK_DECIMALS) if score.average_risk is not None else inf,
@@ -115,33 +120,38 @@ def explain_rank(score: RouteScore, neighbour: RouteScore | None, recommended: b
     comparison = f"{formatter(score)} vs {formatter(neighbour)}"
     if recommended:
         return f"Recommended for {fewest} ({comparison})."
-    if score.unknown_miles > 0:
-        return f"Weather is missing for {score.unknown_miles:.0f} miles, so it ranks lower."
     return f"Ranks lower for {most} ({comparison})."
 
 
 def _deciding_criterion(
     score: RouteScore, neighbour: RouteScore
 ) -> tuple[str, str, Callable[[RouteScore], str]] | None:
-    first_key = rank_key(score)
-    second_key = rank_key(neighbour)
-    if first_key[:2] != second_key[:2]:
-        return (
-            "complete weather",
-            "missing weather",
-            lambda s: f"{s.unknown_miles:.0f} mi missing",
-        )
-    criteria = {
-        2: ("fewest No Travel miles", "more No Travel miles", lambda s: f"{s.no_travel_miles:.1f}"),
-        3: ("fewest Severe miles", "more Severe miles", lambda s: f"{s.severe_miles:.1f}"),
-        4: ("fewest High miles", "more High miles", lambda s: f"{s.high_miles:.1f}"),
-        5: ("lowest average risk", "higher average risk", lambda s: f"{s.average_risk:.2f}"),
-        6: ("shortest travel time", "longer travel time", lambda s: _hours(s.duration_seconds)),
-    }
-    for index, criterion in criteria.items():
-        if first_key[index] != second_key[index]:
+    for index, criterion in enumerate(_RANK_CRITERIA):
+        if rank_key(score)[index] != rank_key(neighbour)[index]:
             return criterion
     return None
+
+
+def _no_travel_text(score: RouteScore) -> str:
+    return f"{score.no_travel_miles:.0f} mi"
+
+
+def _missing_text(score: RouteScore) -> str:
+    return f"{score.unknown_miles:.0f} mi missing"
+
+
+# One entry per position in rank_key: what to call it when a route wins or loses on it.
+_RANK_CRITERIA: tuple[tuple[str, str, Callable[[RouteScore], str]], ...] = (
+    ("avoiding No Travel", "having No Travel miles", _no_travel_text),
+    ("having weather data", "having no weather data", _missing_text),
+    ("complete weather", "missing weather", _missing_text),
+    ("fewest No Travel miles", "more No Travel miles", lambda s: f"{s.no_travel_miles:.1f}"),
+    ("the most complete weather", "more missing weather", _missing_text),
+    ("fewest Severe miles", "more Severe miles", lambda s: f"{s.severe_miles:.1f}"),
+    ("fewest High miles", "more High miles", lambda s: f"{s.high_miles:.1f}"),
+    ("lowest average risk", "higher average risk", lambda s: f"{s.average_risk:.3f}"),
+    ("shortest travel time", "longer travel time", lambda s: _hours(s.duration_seconds)),
+)
 
 
 def _hours(seconds: int) -> str:

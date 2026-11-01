@@ -217,3 +217,12 @@ def test_paid_key_absent_from_logs_and_errors(
         OpenMeteoProvider(api_key="paid-secret", retry_delay_seconds=0).hourly([DENVER])
     assert "paid-secret" not in str(error.value)
     assert "paid-secret" not in caplog.text
+
+
+def test_rain_on_the_no_travel_boundary_is_not_pushed_over_by_float_error(
+    provider: OpenMeteoProvider, mocked: respx.MockRouter
+) -> None:
+    # 0.1 mm + 25.3 mm is 25.4 mm, exactly 1 in/hr, which is Severe rather than No Travel.
+    body = location(rain=[0.1, 0.0], showers=[25.3, 0.0])
+    mocked.get(FREE_URL).mock(httpx.Response(200, json=body))
+    assert provider.hourly([DENVER])[DENVER].rain_in_hr[0] == 1.0

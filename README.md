@@ -74,7 +74,7 @@ npm run dev
 | `ALLOWED_HOSTS` | Comma-separated hostnames the app is served from. |
 | `REDIS_URL` | Cache for forecasts and rate limits. `docker-compose.yml` provides its own. |
 | `OPEN_METEO_API_KEY` | Optional paid key, needed for commercial use. |
-| `NUM_PROXIES` | Trusted proxies in front of the backend, used to find the client's IP. |
+| `NUM_PROXIES` | Trusted proxies in front of the backend, used to find the client's IP. `docker-compose.yml` defaults to 1, and it's 0 otherwise. |
 | `DJANGO_SECURE_SSL_REDIRECT` | Set to `false` only if nothing in front of the app serves HTTPS. |
 | `CORS_ALLOWED_ORIGINS` | Only needed if the frontend is on a different origin. |
 
@@ -151,7 +151,7 @@ There is no deployment pipeline yet, on purpose. Only continuous integration is 
 | No Travel in the ranking | Routes with No Travel miles rank last and are never recommended. If all have them, the app says no route is safe. | The assessment's order never mentions No Travel, so read literally it could recommend a route the rules forbid |
 | Risk miles | Each checkpoint represents the distance between the midpoints with its neighbours, so a route's risk miles sum to its length | Gives each checkpoint a fair share of the road |
 | Average risk | Distance-weighted over known weather, with Low 0, Moderate 1, High 2, Severe 3, No Travel 4 | Long stretches count for more than short ones |
-| Missing weather | Shown as unavailable, never estimated. Those miles are reported, and the route ranks after complete routes. | A guess could hide real danger |
+| Missing weather | Shown as unavailable, never estimated. Routes with missing miles rank after complete routes, most complete first, and a route with no known weather is never recommended. | A guess could hide real danger, and unknown miles can't count as safe |
 | Slider hour 0 | The departure time | The forecast that matters is the one for this trip |
 | Rest stops | Not modelled, so ETAs assume continuous driving | The assessment doesn't provide hours-of-service rules |
 
@@ -159,8 +159,8 @@ Other choices made along the way:
 
 - **Truck speed is capped at about 65 mph.** Without this, TomTom assumes legal limits. Dallas to Denver averaged about 75 mph, which would have read each checkpoint's weather too early.
 - **Average risk can outweigh hours of driving.** The strict order means a tiny difference decides before travel time does. A live run chose 17h 21m over 13h 22m for an average risk of 0.025 against 0.031. This follows the assessment's rule as written.
-- **The heatmap is a blurred circle layer, not a MapLibre heatmap layer.** A heatmap layer colours by how much points overlap, which drew No Travel as pale as Moderate. Here colours always match the legend.
-- **Low and missing hours are both unshaded on the map.** The slider names how many points have no forecast at that hour.
+- **The heatmap is a blurred circle layer, not a MapLibre heatmap layer.** A heatmap layer colours by how much points overlap, which drew No Travel as pale as Moderate. Here colours always match the legend. Low is a faint tint so calm weather still shows the corridor, and missing hours are grey so they can't pass for safe.
+- **If the base map fails to load, a blank background takes its place,** so routes and checkpoints still draw.
 - **Place search is US-only,** because the rules use miles, mph and pounds.
 
 ## Limits to know about
@@ -186,4 +186,4 @@ For separate services, set `API_UPSTREAM` on the frontend container to the backe
 
 ## Repository rules
 
-Commits and contribution rules are in `CLAUDE.md`. In short: pull requests only, every commit signed and Verified, and CI green before merging.
+Every decision made during the build, with its reasoning, is in [docs/decisions.md](docs/decisions.md). Commits and contribution rules are in `CLAUDE.md`. In short: pull requests only, every commit signed and Verified, and CI green before merging.

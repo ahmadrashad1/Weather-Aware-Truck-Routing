@@ -9,6 +9,10 @@ from types import ModuleType
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.test import override_settings
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
+from rest_framework.throttling import BaseThrottle
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ENV_NAMES = (
@@ -83,12 +87,27 @@ def test_https_redirect_can_be_turned_off_for_a_local_stack(
     assert settings.SECURE_SSL_REDIRECT is False
 
 
-def test_forwarded_headers_are_ignored_unless_a_proxy_is_declared(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_no_proxy_is_trusted_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = load_settings(monkeypatch, **PRODUCTION)
-    assert settings.REST_FRAMEWORK["NUM_PROXIES"] is None
+    assert settings.REST_FRAMEWORK["NUM_PROXIES"] == 0
     assert settings.SECURE_PROXY_SSL_HEADER is None
+
+
+def client_identity(forwarded_for: str) -> str:
+    request = APIRequestFactory().get(
+        "/", HTTP_X_FORWARDED_FOR=forwarded_for, REMOTE_ADDR="10.0.0.9"
+    )
+    return str(BaseThrottle().get_ident(Request(request)))
+
+
+def test_a_forged_header_cannot_dodge_rate_limits_by_default() -> None:
+    assert client_identity("1.1.1.1") == "10.0.0.9"
+    assert client_identity("2.2.2.2") == "10.0.0.9"
+
+
+@override_settings(REST_FRAMEWORK={"NUM_PROXIES": 1})
+def test_behind_one_proxy_the_client_is_what_the_proxy_appended() -> None:
+    assert client_identity("9.9.9.9, 203.0.113.7") == "203.0.113.7"
 
 
 def test_a_declared_proxy_is_trusted_for_client_ip_and_scheme(

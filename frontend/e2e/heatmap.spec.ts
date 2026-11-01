@@ -45,6 +45,14 @@ test('shading colour shows the risk level, not how many points overlap', async (
   expect(whenNoTravel - whenModerate).toBeGreaterThan(5000)
 })
 
+test('a missing hour looks different from a safe one', async ({ page }) => {
+  const slider = page.getByRole('slider', { name: 'Forecast hour' })
+  const allLow = await settledMap(page)
+  await slider.fill('30')
+  const halfMissing = await settledMap(page)
+  expect(halfMissing.equals(allLow)).toBe(false)
+})
+
 test('moving from hour 0 to hour 48 makes no network requests', async ({
   page,
 }) => {
