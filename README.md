@@ -171,7 +171,7 @@ Other choices made along the way:
 | Provider | Limit | What it means here |
 | --- | --- | --- |
 | Open-Meteo, free tier | 600 locations a minute, 5,000 an hour, 10,000 a day. Each location counts as one call, which we measured because the docs don't say. Non-commercial use only. | A coast-to-coast trip at 10-mile sampling uses about 850 locations. On an empty cache it waits out the per-minute limit once and takes about 80 seconds. About 8 such trips with heatmaps use the daily limit. |
-| TomTom, free tier | Sources disagree on the current quota, so check your dashboard. | Each plan uses one request, or up to three if detours are needed. Repeat trips aren't cached. |
+| TomTom, free tier | Sources disagree on the current quota, so check your dashboard. | Each plan uses one request, or up to three if detours are needed. Its terms don't allow caching results for several users, so repeat trips and searches aren't cached. |
 
 Forecasts are cached in the app's memory for an hour by location, on a grid of about 3.5 miles, so a restart or update empties the cache. Each IP can make 30 plans and 30 heatmaps an hour, and 120 place searches a minute. Each IP can also fetch 1,500 new forecast locations an hour, and the whole app stays under Open-Meteo's free limits. See [docs/deployment.md](docs/deployment.md#quota-protection).
 

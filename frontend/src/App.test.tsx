@@ -50,6 +50,11 @@ function stubApi(
   const fetchMock = vi.fn<
     (input: string, init?: RequestInit) => Promise<Response>
   >((input) => {
+    if (input.includes('/attribution')) {
+      return Promise.resolve(
+        jsonResponse({ routing_caption: '©Provider Caption' }),
+      )
+    }
     if (input.includes('/geocode')) {
       const results = input.includes('Dal') ? [DALLAS] : [DENVER]
       return Promise.resolve(jsonResponse({ results }))
@@ -77,7 +82,8 @@ describe('App', () => {
     vi.unstubAllGlobals()
   })
 
-  it('credits the data providers and links the weather licence', () => {
+  it('credits the weather licence, and TomTom with its own caption', async () => {
+    stubApi(() => jsonResponse(plan))
     renderWithQueries(<App />)
     expect(
       screen.getByRole('link', { name: 'Weather data by Open-Meteo.com' }),
@@ -87,10 +93,27 @@ describe('App', () => {
       'https://creativecommons.org/licenses/by/4.0/',
     )
     expect(screen.getByText(/used to calculate risk levels/)).toBeVisible()
-    expect(screen.getByRole('link', { name: 'TomTom' })).toHaveAttribute(
-      'href',
-      'https://www.tomtom.com/',
+    expect(
+      await screen.findByText(/Routes and place search: ©Provider Caption/),
+    ).toBeVisible()
+    expect(screen.queryByRole('link', { name: /TomTom/ })).toBeNull()
+  })
+
+  it('leaves out the routing credit, rather than inventing one, if it cannot load', async () => {
+    const fetchMock = stubApi(() => jsonResponse(plan))
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({ code: 'provider_unavailable', message: 'down' }, 503),
+      ),
     )
+    renderWithQueries(<App />)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(screen.queryByText(/Routes and place search/)).toBeNull(),
+    )
+    expect(
+      screen.getByRole('heading', { name: 'Weather-Aware Truck Routing' }),
+    ).toBeVisible()
   })
 
   it('renders the heading', () => {

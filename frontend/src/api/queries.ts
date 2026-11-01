@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 
 import {
   ApiError,
+  fetchAttribution,
   fetchHeatmap,
   geocode,
   planTrip,
@@ -11,7 +12,6 @@ import {
 } from './client'
 
 const MIN_SEARCH_LENGTH = 2
-const SEARCH_CACHE_MS = 60 * 60 * 1000
 
 // A plan is large, and query keys are hashed on every render, so key on a small id per plan.
 // Route ids repeat between plans, so they cannot identify one.
@@ -40,7 +40,17 @@ export function useGeocode(query: string) {
     queryKey: ['geocode', trimmed.toLowerCase()],
     queryFn: ({ signal }) => geocode(trimmed, signal),
     enabled: trimmed.length >= MIN_SEARCH_LENGTH,
-    staleTime: SEARCH_CACHE_MS,
+    // TomTom's terms allow client caching only when its response has cache headers, and search
+    // responses don't. A result is gone as soon as nothing is showing it.
+    staleTime: 0,
+    gcTime: 0,
+  })
+}
+
+export function useAttribution() {
+  return useQuery({
+    queryKey: ['attribution'],
+    queryFn: ({ signal }) => fetchAttribution(signal),
   })
 }
 

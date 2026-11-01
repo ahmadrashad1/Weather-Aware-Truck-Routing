@@ -106,6 +106,7 @@ REST_FRAMEWORK = {
         "heatmap": "30/hour",
         "geocode": "120/minute",
         "vitals": "120/hour",
+        "attribution": "120/hour",
     },
 }
 

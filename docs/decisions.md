@@ -47,7 +47,7 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 ## Task 9
 
 - Load weight is required with no default or placeholder value — a pre-filled weight could silently change a safety result — cost if wrong: one extra field to fill in.
-- Place search waits 250ms after typing and needs 2 characters, and results are cached for an hour — type-ahead spends the shared TomTom quota — cost if wrong: slightly slower suggestions.
+- Place search waits 250ms after typing and needs 2 characters, and results aren't kept once nothing shows them — type-ahead spends the shared TomTom quota, and TomTom's terms (clause 11.4) allow client caching only with cache headers, which search responses lack — cost if wrong: more search calls when someone retypes the same text.
 - ETAs show in the browser's time zone with its abbreviation — simplest correct display, and departure is entered in the same zone — cost if wrong: a dispatcher in another zone reads local-to-them times, labelled as such.
 - Added Vite's dev proxy to the backend and moved Recharts out as decided earlier — needed to run locally — cost if wrong: none.
 - UseHeatmap keys on a small per-plan id rather than the plan object — hashing about 500 KB of JSON on every render would hurt slider smoothness — cost if wrong: none; covered by tests.
@@ -99,7 +99,7 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - A failed deploy rolls back automatically and isn't retried until a newer commit is published — a bad release shouldn't loop or leave the app down — cost if wrong: a failure caused by a brief outage needs a new commit or a manual redeploy.
 - Redis is removed from the deployed stack, with the cache in the app's process, limited to 5,000 entries, and one worker — the user chose to drop caching infrastructure while there are no users, and rate limits still need a cache — cost if wrong: an empty cache after each update; adding `REDIS_URL` brings Redis back.
 - ALLOWED_HOSTS is still required in production, and `REDIS_URL` no longer is — a server with no Redis must still start — cost if wrong: none.
-- The data credit sits under the page title and in the map's attribution — Open-Meteo's licence asks for it next to wherever its data appears, and the map's control collapses on small screens or after a drag — cost if wrong: a line of text to move. TomTom is credited too, but its exact attribution terms haven't been confirmed.
+- The data credit sits under the page title and in the map's attribution — Open-Meteo's licence asks for it next to wherever its data appears, and the map's control collapses on small screens or after a drag — cost if wrong: a line of text to move. TomTom's credit is its own Copyright API caption, as clause 17.3 of its terms requires, and is left out if that call fails rather than invented. Its name isn't otherwise used, since that needs written approval.
 
 - A trip over the weather budget is refused whole, not checked in part — partly checked routes would rank by what was fetched, not by weather — cost if wrong: a user waits, even though some of the trip could have been checked.
 - The weather budget doesn't track the per-minute limit — the existing wait on Open-Meteo's minute limit already handles it, and tracking it too would add a second wait path — cost if wrong: long trips still see the occasional rate-limit response.
@@ -108,6 +108,7 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - The circuit breaker lives in each process rather than the shared cache — there's one worker, and it needs no extra round trips — cost if wrong: extra workers would each detect an outage separately.
 - Django logs requests in place of Gunicorn's access log — the access log includes search text — cost if wrong: requests rejected before Django aren't logged.
 - `web-vitals` was added for browser timings, reported to our own API instead of an outside service — no account or new data processor is needed — cost if wrong: one small dependency to remove.
+- TomTom results are never cached on the server — clause 11.4 of its terms bans caching that serves several users — cost if wrong: repeat trips and searches keep spending TomTom quota, which is the price of following the terms.
 
 ## Known minor issues, left as they are
 

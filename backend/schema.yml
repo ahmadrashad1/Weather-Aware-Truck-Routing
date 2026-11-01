@@ -3,6 +3,31 @@ info:
   title: Weather-Aware Truck Routing API
   version: 1.0.0
 paths:
+  /api/v1/attribution:
+    get:
+      operationId: attribution_retrieve
+      description: TomTom's credit, from its Copyright API as its terms require.
+      tags:
+      - attribution
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttributionResponse'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
   /api/v1/geocode:
     get:
       operationId: geocode_retrieve
@@ -147,6 +172,13 @@ paths:
           description: ''
 components:
   schemas:
+    AttributionResponse:
+      type: object
+      properties:
+        routing_caption:
+          type: string
+      required:
+      - routing_caption
     Checkpoint:
       type: object
       properties:

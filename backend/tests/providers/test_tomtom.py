@@ -336,3 +336,39 @@ def test_search_outage_raises_unavailable(
     mocked.get(f"{SEARCH_URL}/Dallas.json").mock(httpx.Response(500))
     with pytest.raises(ProviderUnavailable):
         provider.search("Dallas")
+
+
+COPYRIGHT_URL = "https://api.tomtom.com/map/1/copyrights/caption.json"
+
+
+@respx.mock
+def test_attribution_uses_the_copyright_apis_caption_and_cache_header(
+    provider: TomTomProvider,
+) -> None:
+    route = respx.get(COPYRIGHT_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={"formatVersion": "0.0.1", "copyrightsCaption": "©TomTom"},
+            headers={"Cache-Control": "max-age=86400"},
+        )
+    )
+    attribution = provider.attribution()
+    assert attribution.caption == "©TomTom"
+    assert attribution.cache_control == "max-age=86400"
+    assert route.calls[0].request.url.params["key"] == API_KEY
+
+
+@respx.mock
+@pytest.mark.parametrize("body", [{}, {"copyrightsCaption": ""}, {"copyrightsCaption": 5}, []])
+def test_unusable_attribution_is_unavailable(provider: TomTomProvider, body: Any) -> None:
+    respx.get(COPYRIGHT_URL).mock(return_value=httpx.Response(200, json=body))
+    with pytest.raises(ProviderUnavailable):
+        provider.attribution()
+
+
+@respx.mock
+def test_attribution_without_a_cache_header_says_so(provider: TomTomProvider) -> None:
+    respx.get(COPYRIGHT_URL).mock(
+        return_value=httpx.Response(200, json={"copyrightsCaption": "©TomTom"})
+    )
+    assert provider.attribution().cache_control is None

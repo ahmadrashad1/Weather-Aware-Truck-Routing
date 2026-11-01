@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import httpx
 
-from routing.providers.base import Place, ProviderRoute
+from routing.providers.base import Attribution, Place, ProviderRoute
 from routing.providers.errors import NoRouteFound, ProviderUnavailable
 from routing.providers.http import (
     DEFAULT_RETRY_DELAY_SECONDS,
@@ -17,6 +17,7 @@ from routing.services.geometry import LatLon
 
 ROUTING_URL = "https://api.tomtom.com/routing/1/calculateRoute"
 SEARCH_URL = "https://api.tomtom.com/search/2/search"
+COPYRIGHT_URL = "https://api.tomtom.com/map/1/copyrights/caption.json"
 SEARCH_RESULT_LIMIT = 5
 # The assessment's rules are in miles, mph and pounds, so this serves US trips.
 SEARCH_COUNTRIES = "US"
@@ -104,6 +105,15 @@ class TomTomProvider:
             ]
         except (KeyError, TypeError):
             raise ProviderUnavailable("TomTom returned an unreadable place") from None
+
+    def attribution(self) -> Attribution:
+        """Fetch the credit TomTom's terms require the app to show. Never stored on the server."""
+        response = self._get(COPYRIGHT_URL, {})
+        body = _json_body(response)
+        caption = body.get("copyrightsCaption") if isinstance(body, dict) else None
+        if not caption or not isinstance(caption, str):
+            raise ProviderUnavailable("TomTom returned an unreadable caption")
+        return Attribution(caption, response.headers.get("Cache-Control"))
 
     def _get(self, url: str, params: Mapping[str, str | int]) -> httpx.Response:
         if not self._api_key:
