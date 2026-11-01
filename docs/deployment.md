@@ -105,6 +105,8 @@ gh variable set PRODUCTION_URL --body 'https://203-0-113-7.sslip.io'
 gh variable set SERVER_KNOWN_HOSTS --body '203.0.113.7 ssh-ed25519 <host key from step 3>'
 
 # Put the new server's ARN in deploy/aws/github-deploy-policy.json first.
+# GitHub's token subject uses immutable IDs here, so the trust policy's `sub` must match this prefix:
+# gh api repos/ahmadrashad1/Weather-Aware-Truck-Routing/actions/oidc/customization/sub
 aws iam create-open-id-connect-provider \
   --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com
 aws iam create-role --role-name truck-routing-github-deploy \
