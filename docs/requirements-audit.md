@@ -1,6 +1,6 @@
 # Requirements audit
 
-Each requirement from the assessment and `CLAUDE.md`, with what proves it. "Live" means it was also checked by hand against the real providers while building the app. Backend paths are under `backend/tests/`, and frontend paths are under `frontend/`.
+An independent review of the whole project found and fixed five issues, recorded in [decisions.md](decisions.md). Each requirement from the assessment and `CLAUDE.md`, with what proves it. "Live" means it was also checked by hand against the real providers while building the app. Backend paths are under `backend/tests/`, and frontend paths are under `frontend/`.
 
 ## User input
 
@@ -34,7 +34,8 @@ Each requirement from the assessment and `CLAUDE.md`, with what proves it. "Live
 | Route summaries | `src/features/trip/RouteList.test.tsx`, `e2e/trip.spec.ts`. Live. |
 | Corridor heatmap | `services/test_corridor_grid.py`, `services/test_heatmap.py`, `api/test_heatmap_api.py`. Live. |
 | 0–48 hour slider | `src/features/forecast/ForecastSlider.test.tsx`, `HeatmapLayer.test.tsx`, `e2e/heatmap.spec.ts`. Live. |
-| Heatmap colours show real risk | `e2e/heatmap.spec.ts::shading colour shows the risk level`, using real rendered pixels |
+| Heatmap colours show real risk | `e2e/heatmap.spec.ts`, comparing what the map itself draws, with overlays hidden. Live: real forecast risk shows along a long trip. |
+| Heatmap shows on a calm day, and missing data looks different | `e2e/errors.spec.ts::the corridor shows on a calm day`, `e2e/heatmap.spec.ts::a missing hour looks different` |
 | Smooth slider | `HeatmapLayer.test.tsx`, `MapPanel.test.tsx`, and `e2e/heatmap.spec.ts`, which checks for no network requests. Measured live on a 283-point trip: 17ms median frame time and no long tasks, with software rendering. |
 
 ## Failures and invalid input
@@ -45,6 +46,9 @@ Each requirement from the assessment and `CLAUDE.md`, with what proves it. "Live
 | API integration failures | `providers/test_tomtom.py`, `providers/test_open_meteo.py`, `api/test_plan.py`, `e2e/errors.spec.ts`. Live: the per-minute weather limit was hit and waited out. |
 | Invalid inputs | `api/test_plan.py`, `api/test_heatmap_api.py`, `TripForm.test.tsx` |
 | Redis outage | `test_cache.py`. Live: Redis was stopped during a run. |
+| Base map outage | `e2e/errors.spec.ts::routes still draw when the base map fails to load` |
+| Mostly unknown routes | `services/test_route_scorer.py::test_fewer_unknown_miles_outrank_a_cleaner_looking_partial_route` |
+| Forged rate-limit headers | `test_settings.py::test_a_forged_header_cannot_dodge_rate_limits_by_default` |
 | No fabricated results | `services/test_trip_planner.py`, `api/test_plan.py::test_unknown_checkpoint_has_no_invented_values`, `test_settings.py::test_production_code_never_imports_from_tests` |
 | API keys kept private | `providers/test_tomtom.py`, `providers/test_open_meteo.py`, `api/test_plan.py`. Live: no key in the server logs. |
 
@@ -63,7 +67,7 @@ Each requirement from the assessment and `CLAUDE.md`, with what proves it. "Live
 
 | Item | Status |
 | --- | --- |
-| Severe and No Travel on live data | Weather was mild during live runs. These are covered by tests and fixtures, and haven't appeared in a live forecast. |
+| Severe and No Travel on live routes | Weather was mild along live routes. These are covered by tests and fixtures. Darker shading has appeared in live heatmaps, but wasn't checked against the raw forecast. |
 | Smoothness on a real GPU | Measured with software rendering only, which should be the harder case. |
 | Hosted application | Not deployed yet. Only continuous integration is in scope before production. |
 | Loom walkthrough | Still to record, after review. `docs/loom-checklist.md` is the script. |

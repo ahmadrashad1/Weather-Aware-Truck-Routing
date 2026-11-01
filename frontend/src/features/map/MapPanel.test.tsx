@@ -417,14 +417,31 @@ describe('MapPanel', () => {
     }
   })
 
-  it('says when the base map fails, while routes stay usable', () => {
-    setup()
+  function mapError(style: unknown) {
     act(() => {
-      ;(fake.mapProps.onError as unknown as () => void)()
+      ;(fake.mapProps.onError as unknown as (event: unknown) => void)({
+        target: { getStyle: () => style },
+      })
     })
+  }
+
+  it('falls back to a blank map when the base map style fails', () => {
+    setup()
+    const original = fake.mapProps.mapStyle
+    mapError(undefined)
     expect(screen.getByRole('status')).toHaveTextContent(
       'background map could not load',
     )
+    expect(fake.mapProps.mapStyle).not.toBe(original)
+    expect(fake.mapProps.mapStyle).toMatchObject({ version: 8 })
     expect(fake.sources['routes']).toBeDefined()
+  })
+
+  it('stays quiet when only a map tile fails', () => {
+    setup()
+    const original = fake.mapProps.mapStyle
+    mapError({ layers: [{ id: 'water' }] })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(fake.mapProps.mapStyle).toBe(original)
   })
 })

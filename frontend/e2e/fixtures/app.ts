@@ -61,17 +61,32 @@ export function routeCard(page: Page, name: RegExp) {
   return page.getByRole('list').getByRole('button', { name })
 }
 
-/** A picture of the map once it has stopped changing. */
+/**
+ * A picture of what the map itself has drawn, once it has stopped changing.
+ *
+ * An element screenshot includes whatever sits on top of it, so route labels, the legend and the
+ * forecast panel are hidden first. Otherwise these would make an empty map look drawn.
+ */
 export async function settledMap(page: Page): Promise<Buffer> {
-  const canvas = page.locator('canvas.maplibregl-canvas')
-  let previous = await canvas.screenshot()
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await page.waitForTimeout(150)
-    const next = await canvas.screenshot()
-    if (next.equals(previous)) return next
-    previous = next
+  const hideOverlays = await page.addStyleTag({
+    content: `
+      main * { visibility: hidden !important; }
+      main canvas.maplibregl-canvas { visibility: visible !important; }
+    `,
+  })
+  try {
+    const canvas = page.locator('canvas.maplibregl-canvas')
+    let previous = await canvas.screenshot()
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await page.waitForTimeout(150)
+      const next = await canvas.screenshot()
+      if (next.equals(previous)) return next
+      previous = next
+    }
+    throw new Error('The map did not settle')
+  } finally {
+    await hideOverlays.evaluate((element) => (element as Element).remove())
   }
-  throw new Error('The map did not settle')
 }
 
 /** How many map pixels are dark, which only No Travel shading or a dark line can be. */

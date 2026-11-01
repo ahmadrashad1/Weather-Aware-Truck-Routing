@@ -99,7 +99,7 @@ The PDF leaves these open. They are project decisions, and the README must docum
 - **No Travel in ranking:** the PDF's order never mentions No Travel, so read literally it could recommend a route the rules forbid. Routes with any No Travel miles rank after all others and are never recommended. If every route has them, the API returns no recommendation and says so.
 - **Risk miles:** each checkpoint represents the distance from the midpoint with its previous checkpoint to the midpoint with its next one. A route's represented miles sum to its total length.
 - **Average risk:** distance-weighted over checkpoints with known weather, on the scale Low=0, Moderate=1, High=2, Severe=3, No Travel=4.
-- **Missing weather:** the checkpoint is `unknown`, never estimated. Unknown miles are reported, and a route with any ranks after complete routes.
+- **Missing weather:** the checkpoint is `unknown`, never estimated. Unknown miles are reported. A route with any ranks after complete routes, most complete first, and a route with no known weather is never recommended.
 - **Forecast slider:** hour 0 is the departure time.
 - **ETAs exclude rest stops:** no hours-of-service breaks or layovers are modelled.
 

@@ -69,9 +69,10 @@ CACHES = (
 TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")
 OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY", "")
 
-# How many trusted proxies sit in front of the app. Forwarded headers are spoofable without one, so
-# they are ignored unless this is set. Set too low, all users share one rate limit.
-NUM_PROXIES = int(os.environ["NUM_PROXIES"]) if os.environ.get("NUM_PROXIES") else None
+# How many trusted proxies sit in front of the app. Forwarded headers can be forged, so with 0 they
+# are ignored and the connection's own address identifies the client. Behind a proxy, set this or
+# all users share one rate limit. Too high, and a forged header can dodge the limit.
+NUM_PROXIES = int(os.environ.get("NUM_PROXIES") or 0)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if NUM_PROXIES else None
 
 SECURE_SSL_REDIRECT = (

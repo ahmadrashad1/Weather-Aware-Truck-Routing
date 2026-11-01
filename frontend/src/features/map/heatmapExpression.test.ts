@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import type { HeatmapResponse } from '@/api/client'
 
-import { RISK_DISPLAY } from '@/lib/risk'
-
 import { heatmapColor, heatmapToGeoJson } from './heatmapExpression'
 
 const data: HeatmapResponse = {
@@ -28,27 +26,26 @@ describe('heatmapColor', () => {
     ])
   })
 
-  it('gives each risk level exactly its legend colour', () => {
+  it('gives every risk level its legend colour, faintly for Low', () => {
     const expression = heatmapColor(0) as unknown[]
     const colors = Object.fromEntries(
-      [1, 2, 3, 4].map((level) => [
+      [0, 1, 2, 3, 4].map((level) => [
         level,
         expression[expression.indexOf(level) + 1],
       ]),
     )
     expect(colors).toEqual({
-      1: RISK_DISPLAY.moderate.color,
-      2: RISK_DISPLAY.high.color,
-      3: RISK_DISPLAY.severe.color,
-      4: RISK_DISPLAY.no_travel.color,
+      0: 'rgba(47, 143, 91, 0.25)',
+      1: 'rgba(227, 181, 5, 0.6)',
+      2: 'rgba(232, 119, 12, 0.6)',
+      3: 'rgba(196, 18, 47, 0.6)',
+      4: 'rgba(74, 13, 26, 0.6)',
     })
   })
 
-  it('leaves Low and missing hours unshaded', () => {
+  it('shows a missing hour in the legend grey, so it can’t pass for safe', () => {
     const expression = heatmapColor(0) as unknown[]
-    expect(expression.at(-1)).toBe('rgba(0, 0, 0, 0)')
-    expect(expression).not.toContain(0)
-    expect(expression).not.toContain(-1)
+    expect(expression.at(-1)).toBe('rgba(154, 163, 168, 0.45)')
   })
 })
 

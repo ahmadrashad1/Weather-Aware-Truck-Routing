@@ -3,6 +3,7 @@ import {
   json,
   planTrip,
   routeCard,
+  settledMap,
   stubApi,
   test,
 } from './fixtures/app.ts'
@@ -142,6 +143,63 @@ test('routes stay usable when only the heatmap fails, and it can retry', async (
     page.getByRole('slider', { name: 'Forecast hour' }),
   ).toBeVisible()
   ignoreExpectedFailures(problems)
+})
+
+test('the corridor shows on a calm day, when every hour is Low', async ({
+  page,
+}) => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await stubApi(page, {
+    heatmap: async (route) => {
+      await held
+      await json({
+        ...heatmap,
+        risk: heatmap.risk.map((frames) => frames.map(() => 0)),
+      })(route)
+    },
+  })
+  await page.goto('/')
+  await planTrip(page)
+  await expect(routeCard(page, /Route 1/)).toBeVisible()
+  const routesOnly = await settledMap(page)
+
+  release()
+  await expect(
+    page.getByRole('slider', { name: 'Forecast hour' }),
+  ).toBeVisible()
+  const withHeatmap = await settledMap(page)
+  expect(withHeatmap.equals(routesOnly)).toBe(false)
+})
+
+test('routes still draw when the base map fails to load', async ({
+  page,
+  problems,
+}) => {
+  await stubApi(page)
+  await page.route('**/styles/**', (route) => route.abort())
+  await page.goto('/')
+  await expect(page.getByRole('status')).toContainText(
+    'background map could not load',
+  )
+  const empty = await settledMap(page)
+
+  await planTrip(page)
+  await expect(
+    page.getByRole('slider', { name: 'Forecast hour' }),
+  ).toBeVisible()
+  const withRoutes = await settledMap(page)
+  expect(withRoutes.equals(empty)).toBe(false)
+
+  // The aborted request itself is logged, and that's expected here.
+  const expected = /Failed to load resource|Failed to fetch/
+  problems.splice(
+    0,
+    problems.length,
+    ...problems.filter((problem) => !expected.test(problem)),
+  )
 })
 
 test('routes appear before a slow heatmap finishes', async ({ page }) => {

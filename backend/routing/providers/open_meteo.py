@@ -23,6 +23,7 @@ MINUTE_LIMIT_RESET_SECONDS = 60
 
 MM_PER_INCH = 25.4
 CM_PER_INCH = 2.54
+RATE_DECIMALS = 6
 
 
 class OpenMeteoProvider:
@@ -103,8 +104,12 @@ def _parse_forecast(location: Mapping[str, Any]) -> HourlyForecast:
         # `precipitation` would include snow, and `rain` alone would miss convective showers.
         # Values are sums over the preceding hour, so they are already rates per hour.
         rain_in_hr=tuple(
-            None if a is None or b is None else (a + b) / MM_PER_INCH
+            # Rounded so float error can't push exactly 1 in/hr over the No Travel limit.
+            None if a is None or b is None else round((a + b) / MM_PER_INCH, RATE_DECIMALS)
             for a, b in zip(rain, showers, strict=True)
         ),
-        snow_in_hr=tuple(None if value is None else value / CM_PER_INCH for value in snowfall),
+        snow_in_hr=tuple(
+            None if value is None else round(value / CM_PER_INCH, RATE_DECIMALS)
+            for value in snowfall
+        ),
     )
