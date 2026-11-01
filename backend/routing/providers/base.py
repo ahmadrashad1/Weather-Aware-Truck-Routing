@@ -29,6 +29,12 @@ class HourlyForecast:
     snow_in_hr: tuple[float | None, ...]
 
 
+@dataclass(frozen=True)
+class Attribution:
+    caption: str
+    cache_control: str | None
+
+
 class RoutingProvider(Protocol):
     def routes(
         self,
@@ -43,6 +49,10 @@ class RoutingProvider(Protocol):
 
 class GeocodingProvider(Protocol):
     def search(self, query: str) -> list[Place]: ...
+
+
+class AttributionProvider(Protocol):
+    def attribution(self) -> Attribution: ...
 
 
 class WeatherProvider(Protocol):

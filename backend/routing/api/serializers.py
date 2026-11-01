@@ -132,6 +132,10 @@ class GeocodeQuerySerializer(serializers.Serializer[Any]):
     q = serializers.CharField(max_length=200)
 
 
+class AttributionResponseSerializer(serializers.Serializer[Any]):
+    routing_caption = serializers.CharField()
+
+
 class VitalSerializer(serializers.Serializer[Any]):
     name = serializers.ChoiceField(choices=["CLS", "FCP", "INP", "LCP", "TTFB"])
     value = FiniteFloatField(min_value=0, max_value=MAX_VITAL_VALUE)

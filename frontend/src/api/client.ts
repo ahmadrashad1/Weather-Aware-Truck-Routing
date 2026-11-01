@@ -82,6 +82,12 @@ export function fetchHeatmap(body: HeatmapRequest): Promise<HeatmapResponse> {
   return postJson('/api/v1/trips/heatmap', body)
 }
 
+export function fetchAttribution(
+  signal?: AbortSignal,
+): Promise<Schemas['AttributionResponse']> {
+  return request('/api/v1/attribution', { signal })
+}
+
 export function geocode(
   query: string,
   signal?: AbortSignal,

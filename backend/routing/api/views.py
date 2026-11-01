@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from config.observability import log_event
 from routing.api.serializers import (
+    AttributionResponseSerializer,
     ErrorSerializer,
     GeocodeQuerySerializer,
     GeocodeResponseSerializer,
@@ -21,7 +22,7 @@ from routing.api.serializers import (
     heatmap_to_response,
     plan_to_response,
 )
-from routing.providers.base import GeocodingProvider, Place, RoutingProvider
+from routing.providers.base import AttributionProvider, GeocodingProvider, Place, RoutingProvider
 from routing.providers.open_meteo import OpenMeteoProvider
 from routing.providers.tomtom import TomTomProvider
 from routing.services.corridor_grid import corridor_points
@@ -29,6 +30,8 @@ from routing.services.heatmap import build_heatmap
 from routing.services.trip_planner import TripRequest, plan_trip
 from routing.services.weather_budget import BudgetLimits, Purpose, WeatherBudget
 from routing.services.weather_lookup import RequestWeather, WeatherLookup
+
+NO_STORE = "no-store"
 
 
 @lru_cache(maxsize=1)
@@ -41,6 +44,10 @@ def get_routing_provider() -> RoutingProvider:
 
 
 def get_geocoding_provider() -> GeocodingProvider:
+    return _tomtom()
+
+
+def get_attribution_provider() -> AttributionProvider:
     return _tomtom()
 
 
@@ -141,7 +148,29 @@ class GeocodeView(APIView):
             {"label": place.label, "lat": place.position[0], "lon": place.position[1]}
             for place in places
         ]
-        return Response(GeocodeResponseSerializer({"results": results}).data)
+        # TomTom's terms allow client caching only when its response has cache headers, and search
+        # responses don't. They also ban any caching that serves results to several users.
+        return Response(
+            GeocodeResponseSerializer({"results": results}).data,
+            headers={"Cache-Control": NO_STORE},
+        )
+
+
+class AttributionView(APIView):
+    """TomTom's credit, from its Copyright API as its terms require."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "attribution"
+
+    @extend_schema(
+        responses={200: AttributionResponseSerializer, 429: ErrorSerializer, 503: ErrorSerializer}
+    )
+    def get(self, request: Request) -> Response:
+        attribution = get_attribution_provider().attribution()
+        return Response(
+            AttributionResponseSerializer({"routing_caption": attribution.caption}).data,
+            headers={"Cache-Control": attribution.cache_control or NO_STORE},
+        )
 
 
 class VitalsView(APIView):

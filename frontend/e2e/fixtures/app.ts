@@ -37,6 +37,9 @@ export async function stubApi(page: Page, stubs: ApiStubs = {}) {
     const results = query.startsWith('Dal') ? [DALLAS] : [DENVER]
     return route.fulfill({ json: { results } })
   })
+  await page.route('**/api/v1/attribution', (route) =>
+    route.fulfill({ json: { routing_caption: '©TomTom' } }),
+  )
   await page.route('**/api/v1/vitals', (route) =>
     route.fulfill({ status: 204 }),
   )
