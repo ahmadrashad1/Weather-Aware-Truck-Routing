@@ -1,0 +1,27 @@
+{
+  "category": "maps",
+  "duration_s": 8,
+  "fps": 30,
+  "canvas": {
+    "w": 1920,
+    "h": 1080,
+    "aspect": "16:9"
+  },
+  "style": "Calm, dark, Apple-style product film: routes draw, one lights up, checkpoints appear. No text.",
+  "palette": [
+    "#000000",
+    "#101114",
+    "#f5f5f7",
+    "#2f8f5b",
+    "#e3b505",
+    "#e8770c",
+    "#c4122f"
+  ],
+  "export": "mp4",
+  "asset_needs": [],
+  "content": {
+    "lane": "vector",
+    "shot": "flow",
+    "note": "Illustrative only. Outline from the us-atlas package (ISC), baked into index.html as a static path. Checkpoint colours are the app's risk palette, not real weather."
+  }
+}

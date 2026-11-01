@@ -24,7 +24,7 @@ function StripMap({ route }: { route: Route }) {
     <span
       role="img"
       aria-label={`Risk along the route: ${description}`}
-      className="flex h-3.5 w-full overflow-hidden rounded-sm border border-white bg-white"
+      className="flex h-3.5 w-full overflow-hidden rounded-sm bg-asphalt/5"
     >
       {route.segments.map((segment) => (
         <span
@@ -43,7 +43,7 @@ function StripMap({ route }: { route: Route }) {
 function Reading({ label, value }: { label: string; value: string }) {
   return (
     <span className="block">
-      <span className="block text-xs opacity-75">{label}</span>
+      <span className="block text-xs text-muted-foreground">{label}</span>
       <span className="block font-semibold tabular-nums">{value}</span>
     </span>
   )
@@ -62,19 +62,16 @@ export const RouteCard = memo(function RouteCard({
       aria-pressed={isSelected}
       onClick={() => onSelect(route.id)}
       className={cn(
-        'block w-full px-4 py-3.5 text-left focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber',
-        isRecommended
-          ? // Styled as a highway guide sign, with its inset white keyline.
-            'rounded-lg bg-sign-green text-white outline-2 -outline-offset-[5px] outline-white'
-          : 'rounded-md border border-transparent hover:bg-white',
-        !isRecommended && isSelected && 'border-asphalt/30 bg-white',
-        isRecommended && isSelected && 'ring-3 ring-amber',
+        'pressable block w-full rounded-2xl bg-white px-4 py-3.5 text-left shadow-[0_1px_3px_rgb(0_0_0/0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action',
+        isSelected && 'ring-2 ring-action',
       )}
     >
       <span className="flex items-baseline justify-between gap-3 px-1">
-        <span className="text-lg font-bold">Route {route.rank}</span>
+        <span className="text-lg font-semibold">Route {route.rank}</span>
         {isRecommended ? (
-          <span className="text-sm font-semibold">Recommended</span>
+          <span className="rounded-full bg-action px-2.5 py-0.5 text-xs font-semibold text-white">
+            Recommended
+          </span>
         ) : null}
       </span>
 
@@ -119,7 +116,7 @@ export const RouteCard = memo(function RouteCard({
       <span className="mt-2.5 block px-1 text-sm">
         Arrives {formatEta(summary.arrival_at)}
       </span>
-      <span className="mt-1 mb-0.5 block px-1 text-sm opacity-85">
+      <span className="mt-1 mb-0.5 block px-1 text-sm text-muted-foreground">
         {route.rationale}
       </span>
     </button>

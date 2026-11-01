@@ -34,3 +34,8 @@ test-results/
 .idea/
 .vscode/
 .DS_Store
+
+# Rendered hero clip. The final files live in frontend/src/assets/hero.
+videos/*/renders/
+videos/*/node_modules/
+videos/*/.hyperframes/

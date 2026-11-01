@@ -3,30 +3,35 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Highway sign colours: asphalt, poured concrete, guide-sign green, warning amber. */
-  --asphalt: #1f2529;
-  --concrete: #eef0ec;
-  --sign-green: #0a5c45;
+  /* Near-black ink and soft grey ground, as on Apple's own pages. Blue means "you can act on this",
+     which keeps it apart from the risk colours on the map. */
+  --asphalt: #1d1d1f;
+  --concrete: #f5f5f7;
+  --action: #0066cc;
   --amber: #f2b705;
   --risk-severe: #c4122f;
+
+  /* A spring with no overshoot, because nothing here is thrown. Used for press and selection. */
+  --ease-settle: cubic-bezier(0.32, 0.72, 0, 1);
 
   --background: #ffffff;
   --foreground: var(--asphalt);
   --primary: var(--asphalt);
   --primary-foreground: #ffffff;
   --muted: var(--concrete);
-  --muted-foreground: #5a6469;
-  --border: #c9cec9;
-  --input: #8f989c;
-  --ring: var(--sign-green);
-  --radius: 0.375rem;
+  --muted-foreground: #6e6e73;
+  --border: #d2d2d7;
+  --input: #d2d2d7;
+  --ring: var(--action);
+  --radius: 0.75rem;
 }
 
 @theme inline {
-  --font-sans: 'Overpass Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --color-asphalt: var(--asphalt);
   --color-concrete: var(--concrete);
-  --color-sign-green: var(--sign-green);
+  --color-action: var(--action);
   --color-amber: var(--amber);
   --color-risk-severe: var(--risk-severe);
   --color-background: var(--background);
@@ -43,13 +48,102 @@
 
 @layer base {
   body {
-    @apply bg-background text-foreground;
+    @apply bg-black text-foreground antialiased;
+  }
+
+  /* Tracking follows size: tight on large type, near zero on body text. */
+  h1,
+  h2 {
+    letter-spacing: -0.02em;
+  }
+}
+
+/* A floating layer that the map shows through. A larger surface would read as thicker, so this
+   stays opaque enough that map labels can't compete with the text on it. A utility, so that
+   responsive variants such as lg:material work. */
+@utility material {
+  background: rgb(255 255 255 / 0.84);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.05),
+    0 12px 40px rgb(0 0 0 / 0.14);
+
+  @media (prefers-reduced-transparency: reduce) {
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  @media (prefers-contrast: more) {
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 0 0 1px #1d1d1f;
+  }
+}
+
+@layer components {
+  /* Large type gets tight leading and negative tracking, because its letters read as far apart. */
+  .display-type {
+    font-size: clamp(2.75rem, 7.5vw, 5.75rem);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-optical-sizing: auto;
+  }
+
+  /* Feedback on press, not on release. */
+  .pressable {
+    transition:
+      transform 180ms var(--ease-settle),
+      background-color 180ms ease;
+  }
+
+  .pressable:active {
+    transform: scale(0.97);
+    transition-duration: 60ms;
+  }
+
+  .scroll-cue {
+    animation: scroll-cue 1.6s var(--ease-settle) 3 both;
+  }
+}
+
+@keyframes scroll-cue {
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* The map needs to land exactly in view, and a phone's page is too long to snap. */
+@media (min-width: 1024px) {
+  html {
+    scroll-snap-type: y proximity;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable,
+  .pressable:active {
+    transform: none;
+    transition: background-color 180ms ease;
+  }
+
+  .scroll-cue {
+    animation: none;
   }
 }
 
 /* The map's stylesheet sets its own type and spacing on these. */
 .maplibregl-map .maplibregl-popup-content {
   font-family: inherit;
-  padding: 0.75rem;
-  border-radius: var(--radius);
+  padding: 0.875rem;
+  border-radius: 1rem;
 }

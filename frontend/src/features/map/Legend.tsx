@@ -14,7 +14,7 @@ export function Legend() {
   return (
     <ul
       aria-label="Risk levels"
-      className="absolute top-2 left-2 z-10 flex max-w-[calc(100%-4rem)] flex-wrap gap-x-3 gap-y-0.5 rounded-md bg-white/95 px-2.5 py-1.5 text-xs shadow-sm"
+      className="material absolute top-3 left-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap gap-x-3 gap-y-0.5 rounded-2xl px-3 py-1.5 text-xs lg:left-[27.5rem] lg:max-w-[calc(100%-32rem)]"
     >
       {LEVELS.map((risk) => (
         <li key={risk}>
