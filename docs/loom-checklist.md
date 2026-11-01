@@ -4,7 +4,7 @@ A script for the 5–10 minute walkthrough. The timings add up to about 8 minute
 
 ## Before recording
 
-- [ ] Start the app with `docker compose up --build`, and open <http://localhost:8080>.
+- [ ] Open the live app at <https://3-24-117-219.sslip.io>. Don't merge anything while recording, because each update restarts the app and empties its cache.
 - [ ] Plan the demo trips once beforehand. Forecasts stay cached for an hour, so they load quickly during the recording.
 - [ ] Check the forecast and pick a trip with real bad weather if you can. A calm trip still shows the corridor in green. To show every risk colour, use the fixture run below.
 - [ ] Zoom the browser so the map and route cards are readable.

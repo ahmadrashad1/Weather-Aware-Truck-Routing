@@ -53,6 +53,16 @@ An independent review of the whole project found and fixed five issues, recorded
 | No fabricated results | `services/test_trip_planner.py`, `api/test_plan.py::test_unknown_checkpoint_has_no_invented_values`, `test_settings.py::test_production_code_never_imports_from_tests` |
 | API keys kept private | `providers/test_tomtom.py`, `providers/test_open_meteo.py`, `api/test_plan.py`. Live: no key in the server logs. |
 
+## Hosting
+
+| Requirement | Proof |
+| --- | --- |
+| Hosted application | Live at <https://3-24-117-219.sslip.io>. Checked with a real browser at desktop and mobile widths, including canvas clicks, with no console errors. |
+| Long trips work through the full path | New York to Los Angeles at 10-mile sampling: 83s for routes and 88s with the heatmap. |
+| Fits the server | The same trip peaked at 583 MB of 909 MB, with 14 MB of swap and no container restarts. |
+| Deploys itself | A merge updated the server without help, and the workflow waited for the new version. |
+| Forged headers are ignored | A forged `X-Forwarded-For` didn't reach the app. |
+
 ## Engineering rules
 
 | Requirement | Proof |
@@ -70,6 +80,6 @@ An independent review of the whole project found and fixed five issues, recorded
 | --- | --- |
 | Severe and No Travel on live routes | Weather was mild along live routes. These are covered by tests and fixtures. Darker shading has appeared in live heatmaps, but wasn't checked against the raw forecast. |
 | Smoothness on a real GPU | Measured with software rendering only, which should be the harder case. |
-| Hosted application | Not deployed yet. Only continuous integration is in scope before production. |
-| Loom walkthrough | Still to record, after review. `docs/loom-checklist.md` is the script. |
+| Loom walkthrough | Still to record. `docs/loom-checklist.md` is the script. |
+| Rollback on a real server | Tested with stubbed `docker` and `git` in `test_deploy_update.py`. Successful deploys have run on the real server, but a failing one hasn't. |
 | Live smoke workflow on GitHub | Passed locally. It needs a `TOMTOM_API_KEY` repository secret, and hasn't run on GitHub. |

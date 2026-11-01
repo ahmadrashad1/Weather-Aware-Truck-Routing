@@ -1,5 +1,7 @@
 # Weather-Aware Truck Routing
 
+**Live app: <https://3-24-117-219.sslip.io>**
+
 A React and Django app that helps a truck driver choose the safest route. Enter an origin, destination, departure time and load weight, and it compares three routes using the forecast for when the truck will actually reach each point along the way.
 
 - Three route options from a truck routing API
