@@ -1,16 +1,16 @@
 # Deployment
 
-The app runs on one Amazon Lightsail server, and updates itself after CI passes on `main`.
+The app runs on one Amazon Lightsail server, and deploys automatically after CI passes on `main`.
 
 ```mermaid
 flowchart LR
     Main["Merge to main"] --> CI["CI passes"] --> Publish["Deploy workflow publishes images to GHCR"]
-    Publish --> Tag["Moves the production tag"]
-    Server["Lightsail server: timer every 2 minutes"] -->|pulls| Tag
-    Server --> Health{"Healthy on the new version?"}
-    Health -->|yes| Done["Records it as current"]
-    Health -->|no| Back["Rolls back and records it as failed"]
-    Publish -.->|waits for the version on /api/v1/health| Server
+    Publish --> OIDC["Signs in to AWS through GitHub OIDC"]
+    OIDC --> Port["Opens SSH to this runner only"]
+    Port --> Update["Runs the update on the server"]
+    Update --> Health{"Healthy on the new version?"}
+    Health -->|yes| Close["Closes SSH and confirms the public site"]
+    Health -->|no| Back["Rolls back, closes SSH and fails the workflow"]
 ```
 
 ```mermaid
@@ -23,15 +23,24 @@ flowchart LR
     Django --> OpenMeteo["Open-Meteo"]
 ```
 
-## How updates work
+## How deploys work
 
 1. A merge to `main` runs CI.
 2. If CI passes, the `Deploy` workflow publishes both images, tagged with the commit, then moves the `production` tag to them.
-3. Every 2 minutes, `deploy/update.sh` on the server checks that tag. If it's new, the script checks out that commit, starts the images and confirms the version through nginx.
-4. If the new version isn't healthy, the script rolls back and won't retry that commit until a newer one is published.
-5. The workflow waits for `/api/v1/health` to report the new version, so a failed deploy shows as a failed workflow.
+3. The workflow signs in to AWS through GitHub OIDC, so it gets credentials that expire and GitHub stores no AWS keys.
+4. It opens port 22 to its own IP, gets a short-lived SSH key from Lightsail, and starts `deploy/update.sh` on the server. The server's host key is pinned in the `SERVER_KNOWN_HOSTS` variable.
+5. The script checks out that commit, starts the images and confirms the version through nginx. If the new version isn't healthy, it rolls back and won't retry that commit until a newer one is published. The workflow then fails.
+6. The workflow closes port 22, even after a failure, then confirms the public site reports the new version.
 
-GitHub holds no AWS credentials or SSH keys, and port 22 stays closed. GitHub OIDC isn't used because projects in the new AWS experience can't create identity providers: the managed policy denies `iam:*Provider*` on both the Free and Paid plans.
+## What GitHub can do in AWS
+
+| Limit | How |
+| --- | --- |
+| Which workflows can sign in | The role in `deploy/aws/github-trust-policy.json` trusts only this repository's `production` environment |
+| Which branches can use that environment | The environment only allows `main` |
+| What the role can do | `deploy/aws/github-deploy-policy.json` allows getting SSH access to this one server, and opening or closing its ports. It can't create or delete anything, or reach any other service. |
+
+The SSH access gives root on this server, because the `ubuntu` user has `sudo`. Treat a merge to `main` as deploying to production.
 
 ## Set up a new server
 
@@ -75,7 +84,11 @@ SITE_ADDRESS=203-0-113-7.sslip.io
 ALLOWED_HOSTS=203-0-113-7.sslip.io
 ```
 
-The timer starts deploying once this file exists.
+Then read the host key for step 5, from this signed-in session:
+
+```bash
+cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub
+```
 
 ### 4. Close SSH
 
@@ -85,11 +98,32 @@ aws lightsail put-instance-public-ports --instance-name truck-routing --port-inf
   'fromPort=443,toPort=443,protocol=tcp'
 ```
 
-### 5. Tell GitHub where to check
+### 5. Connect GitHub to AWS
 
 ```bash
 gh variable set PRODUCTION_URL --body 'https://203-0-113-7.sslip.io'
+gh variable set SERVER_KNOWN_HOSTS --body '203.0.113.7 ssh-ed25519 <host key from step 3>'
+
+# Put the new server's ARN in deploy/aws/github-deploy-policy.json first.
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com
+aws iam create-role --role-name truck-routing-github-deploy \
+  --assume-role-policy-document file://deploy/aws/github-trust-policy.json
+aws iam put-role-policy --role-name truck-routing-github-deploy \
+  --policy-name reach-truck-routing-server \
+  --policy-document file://deploy/aws/github-deploy-policy.json
+
+gh variable set AWS_DEPLOY_ROLE_ARN \
+  --body "$(aws iam get-role --role-name truck-routing-github-deploy --query Role.Arn --output text)"
+gh api -X PUT repos/ahmadrashad1/Weather-Aware-Truck-Routing/environments/production \
+  --input - <<< '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
+gh api -X POST repos/ahmadrashad1/Weather-Aware-Truck-Routing/environments/production/deployment-branch-policies \
+  -f name=main -f type=branch
 ```
+
+Then run the `Deploy` workflow by hand for the first deploy.
+
+Rebuilding the server changes its ARN and host key, so update the role's policy and `SERVER_KNOWN_HOSTS` afterwards.
 
 ## Operating it
 
@@ -98,10 +132,10 @@ Open port 22 for your IP as in step 2, connect, then close it again afterwards.
 | Task | How |
 | --- | --- |
 | See what's running | `curl https://<address>/api/v1/health` |
-| Read update logs | `journalctl -u truck-routing-update` |
+| Read update logs | The `Deploy` workflow run shows them, or `journalctl -u truck-routing-update` on the server |
 | Read app logs | `cd /opt/truck-routing/repo && IMAGE_TAG=$(cat ../state/current) docker compose --env-file ../.env -f docker-compose.yml -f deploy/docker-compose.prod.yml --project-name truck-routing logs` |
 | See a revision that failed | `cat /opt/truck-routing/state/failed` |
-| Change a setting | Edit `.env`, then delete `state/current`. The next timer run redeploys the same revision. |
+| Change a setting | Edit `.env`, delete `state/current`, then run the `Deploy` workflow by hand. |
 | Roll back | Revert the commit on `main`. The revert deploys like any other change. |
 | Redeploy without a code change | Run the `Deploy` workflow by hand. |
 
@@ -109,7 +143,8 @@ Open port 22 for your IP as in step 2, connect, then close it again afterwards.
 
 - **One server:** if it fails, the app is down until it's restarted. Each update causes a short outage while containers restart.
 - **Slow first trip:** the cache lives in the app's process, so each update or restart empties it. Rate limit counts reset too.
+- **SSH during deploys:** port 22 is open to the runner's IP for the length of the deploy. If a run is cancelled before it can close, the rule stays until the next deploy, limited to that one IP.
 - **One worker:** the cache isn't shared between processes, so the backend stays on one worker. To add more, set `REDIS_URL` and add Redis.
 - **Provider quotas:** see "Limits to know about" in the README. Commercial use needs a paid Open-Meteo key.
-- **Free plan:** a project on the Free plan closes after 6 months or when its credits run out. Upgrade in AWS Settings to keep the app running after that.
+- **AWS costs:** the project is on the Paid plan, so charges past its credits are billed.
 - **`sslip.io`:** the address and its certificate depend on that free third-party service.

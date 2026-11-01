@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReachThisServerOnly",
+      "Effect": "Allow",
+      "Action": [
+        "lightsail:GetInstanceAccessDetails",
+        "lightsail:OpenInstancePublicPorts",
+        "lightsail:CloseInstancePublicPorts"
+      ],
+      "Resource": "arn:aws:lightsail:ap-southeast-2:429870640845:Instance/1b2c81e2-5910-498f-bd8b-c773963b53f0"
+    }
+  ]
+}

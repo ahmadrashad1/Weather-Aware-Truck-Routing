@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs on the server from a systemd timer. It deploys whatever revision GitHub has published as
-# `production`, and rolls back if that revision doesn't come up healthy.
+# Started on the server by the Deploy workflow. It deploys whatever revision GitHub has published
+# as `production`, and rolls back if that revision doesn't come up healthy.
 set -euo pipefail
 
 ROOT="${TRUCK_ROOT:-/opt/truck-routing}"

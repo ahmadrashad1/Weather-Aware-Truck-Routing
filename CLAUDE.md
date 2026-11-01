@@ -31,7 +31,7 @@ Repository: `git@github.com:ahmadrashad1/Weather-Aware-Truck-Routing.git`
 ### CI/CD
 
 - The project uses CI/CD pipelines to build, test, and ship the software. `docs/deployment.md` describes the deployment.
-- After CI passes on `main`, the `Deploy` workflow publishes images, and the server pulls them. GitHub holds no AWS credentials or SSH keys.
+- After CI passes on `main`, the `Deploy` workflow publishes images and deploys them through GitHub OIDC. GitHub stores no AWS keys.
 - CI runs on every pull request and every push to `main`, using GitHub Actions: lint, type-check, unit tests, build, end-to-end tests, Docker image build (no push), and the commit-policy check.
 - CI never calls live third-party APIs and needs no secrets. Live smoke tests run only on manual dispatch.
 

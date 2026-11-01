@@ -91,10 +91,11 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 
 ## Deployment
 
-- GitHub OIDC is not used — the new AWS experience's managed policy denies `iam:*Provider*` on both the Free and Paid plans, and the user chose to stay on this project rather than activate advanced features or open a new account — cost if wrong: switching means opening a standard account and changing only how the server gets updates.
-- The server pulls updates on a 2-minute timer instead of GitHub connecting to it — no credentials are stored in GitHub and port 22 stays closed — cost if wrong: up to 2 minutes' delay before a deploy starts.
+- Deploys use GitHub OIDC, restricted to the `production` environment, which only allows `main` — no AWS keys are stored in GitHub. This replaces the earlier pull-on-a-timer design, needed only while the AWS account couldn't create identity providers — cost if wrong: the workflow is one file to change.
+- GitHub reaches the server over SSH using Lightsail's short-lived keys, with port 22 open only to the runner during a deploy and the host key pinned — Lightsail has no SSM agent by default, and this avoids a stored SSH key — cost if wrong: a cancelled run can leave that one IP allowed until the next deploy.
+- The role can only get SSH access to this one server and open or close its ports — the narrowest set that works. SSH access still means root on the server — cost if wrong: rebuilding the server needs the policy updated.
 - Deploys run automatically after CI passes on `main` — the user asked for a CD workflow — cost if wrong: remove the trigger, keeping the manual one.
-- The health endpoint reports the running version, and the workflow waits for it — this tells GitHub whether a deploy actually worked — cost if wrong: the commit hash is public, and it's a public repo anyway.
+- The health endpoint reports the running version, and the workflow confirms it on the public site — this proves the deploy reached users — cost if wrong: none; the commit hash is already public.
 - A failed deploy rolls back automatically and isn't retried until a newer commit is published — a bad release shouldn't loop or leave the app down — cost if wrong: a failure caused by a brief outage needs a new commit or a manual redeploy.
 - Redis is removed from the deployed stack, with the cache in the app's process, limited to 5,000 entries, and one worker — the user chose to drop caching infrastructure while there are no users, and rate limits still need a cache — cost if wrong: an empty cache after each update; adding `REDIS_URL` brings Redis back.
 - ALLOWED_HOSTS is still required in production, and `REDIS_URL` no longer is — a server with no Redis must still start — cost if wrong: none.
