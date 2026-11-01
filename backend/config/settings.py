@@ -117,6 +117,9 @@ WEATHER_BUDGET_LIMITS = {"per_hour": 4_750, "per_day": 9_500, "per_client_hour":
 # Heatmaps stop at this share of the shared limits, which keeps the rest for checkpoint risk.
 WEATHER_BUDGET_HEATMAP_SHARE = 0.8
 
+# Heavy requests at once, per worker. Two of the eight threads stay free for searches and health.
+HEAVY_REQUEST_LIMIT = int(os.environ.get("HEAVY_REQUEST_LIMIT") or 6)
+
 # A stand-in for TomTom and Open-Meteo, for load tests only. See docs/load-testing.md. Production
 # always redirects to HTTPS, so this refuses to start there. It also lifts the limits per client,
 # because one load generator is one IP, and the point is to find the server's own limits.

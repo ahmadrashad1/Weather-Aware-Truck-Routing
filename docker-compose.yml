@@ -8,6 +8,7 @@ services:
       REDIS_URL: ${REDIS_URL:-}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
       GUNICORN_THREADS: ${GUNICORN_THREADS:-8}
+      HEAVY_REQUEST_LIMIT: ${HEAVY_REQUEST_LIMIT:-6}
       # The internal names are for the frontend's proxy and the health check below.
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost},127.0.0.1,backend
       NUM_PROXIES: ${NUM_PROXIES:-1}

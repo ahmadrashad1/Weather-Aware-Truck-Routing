@@ -9,6 +9,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from config.observability import log_event
+from routing.api.capacity import HeavyRequestLimiter
 from routing.api.serializers import (
     AttributionResponseSerializer,
     ErrorSerializer,
@@ -32,6 +33,7 @@ from routing.services.weather_budget import BudgetLimits, Purpose, WeatherBudget
 from routing.services.weather_lookup import RequestWeather, WeatherLookup
 
 NO_STORE = "no-store"
+heavy_requests = HeavyRequestLimiter(settings.HEAVY_REQUEST_LIMIT)
 
 
 @lru_cache(maxsize=1)
@@ -89,17 +91,18 @@ class PlanTripView(APIView):
         serializer = PlanRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        plan = plan_trip(
-            TripRequest(
-                origin=_place(data["origin"]),
-                destination=_place(data["destination"]),
-                departure_at=data["departure_at"],
-                load_lb=data["load_lb"],
-                interval_miles=data["interval_miles"],
-            ),
-            get_routing_provider(),
-            _weather_for(request, Purpose.CHECKPOINTS),
-        )
+        with heavy_requests.slot():
+            plan = plan_trip(
+                TripRequest(
+                    origin=_place(data["origin"]),
+                    destination=_place(data["destination"]),
+                    departure_at=data["departure_at"],
+                    load_lb=data["load_lb"],
+                    interval_miles=data["interval_miles"],
+                ),
+                get_routing_provider(),
+                _weather_for(request, Purpose.CHECKPOINTS),
+            )
         return Response(PlanResponseSerializer(plan_to_response(plan)).data)
 
 
@@ -120,12 +123,13 @@ class HeatmapView(APIView):
         serializer = HeatmapRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        heatmap = build_heatmap(
-            corridor_points(data["routes"]),
-            data["departure_at"],
-            data["load_lb"],
-            _weather_for(request, Purpose.HEATMAP),
-        )
+        with heavy_requests.slot():
+            heatmap = build_heatmap(
+                corridor_points(data["routes"]),
+                data["departure_at"],
+                data["load_lb"],
+                _weather_for(request, Purpose.HEATMAP),
+            )
         return Response(HeatmapResponseSerializer(heatmap_to_response(heatmap)).data)
 
 

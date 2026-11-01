@@ -3,7 +3,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from routing.providers.base import HourlyForecast, Place, ProviderRoute, RoutingProvider
-from routing.services.checkpoint_generator import Checkpoint, generate_checkpoints
+from routing.services.checkpoint_generator import (
+    Checkpoint,
+    generate_checkpoints,
+    scaled_cumulative_miles,
+)
 from routing.services.eta_calculator import eta_at
 from routing.services.geometry import LatLon
 from routing.services.risk_engine import assess
@@ -15,7 +19,7 @@ from routing.services.route_scorer import (
     rank_routes,
     score_route,
 )
-from routing.services.route_segments import RouteSegment, build_segments, simplify
+from routing.services.route_segments import RouteSegment, build_segments, display_indices
 from routing.services.weather_lookup import WeatherSource, sample_at
 
 
@@ -60,12 +64,21 @@ def plan_trip(request: TripRequest, routing: RoutingProvider, weather: WeatherSo
         request.load_lb,
     )
     routes = {f"route-{index}": route for index, route in enumerate(alternatives.routes, start=1)}
+    # Costly on a long route, and needed twice, so each is worked out once.
+    cumulative = {
+        route_id: scaled_cumulative_miles(route.geometry, route.total_miles)
+        for route_id, route in routes.items()
+    }
     checkpoints = {
-        route_id: generate_checkpoints(route.geometry, route.total_miles, request.interval_miles)
+        route_id: generate_checkpoints(
+            route.geometry, route.total_miles, request.interval_miles, cumulative[route_id]
+        )
         for route_id, route in routes.items()
     }
     forecasts = weather.forecasts(
-        [checkpoint.position for group in checkpoints.values() for checkpoint in group]
+        [checkpoint.position for group in checkpoints.values() for checkpoint in group],
+        needed_until=request.departure_at
+        + timedelta(seconds=max(route.duration_seconds for route in routes.values())),
     )
     assessed = {
         route_id: [
@@ -84,6 +97,7 @@ def plan_trip(request: TripRequest, routing: RoutingProvider, weather: WeatherSo
     ordered = ranking.ordered_ids
     for position, route_id in enumerate(ordered):
         route = routes[route_id]
+        kept = display_indices(route.geometry)
         # The first route is explained against the one below it, and the rest against the one above.
         neighbour = ordered[1:2] if position == 0 else ordered[position - 1 : position]
         planned.append(
@@ -100,8 +114,14 @@ def plan_trip(request: TripRequest, routing: RoutingProvider, weather: WeatherSo
                 arrival_at=request.departure_at.astimezone(UTC)
                 + timedelta(seconds=route.duration_seconds),
                 score=scores[route_id],
-                geometry=simplify(route.geometry),
-                segments=build_segments(route.geometry, route.total_miles, assessed[route_id]),
+                geometry=tuple(route.geometry[index] for index in kept),
+                segments=build_segments(
+                    route.geometry,
+                    route.total_miles,
+                    assessed[route_id],
+                    cumulative[route_id],
+                    kept,
+                ),
                 checkpoints=assessed[route_id],
             )
         )

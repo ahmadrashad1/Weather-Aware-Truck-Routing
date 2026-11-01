@@ -66,3 +66,18 @@ Change the stand-in while a test runs, with `curl -X POST 'http://<generator-ip>
 | `minute_limit=600` | Applies Open-Meteo's per-minute limit |
 
 A database pressure scenario doesn't apply, because the app has no database.
+
+## Results so far
+
+These are from one partial run on 2026-11-01, on a new 1 GB server with no burst capacity. Each stage planned a different trip each time, so the cache rarely helped. The test was stopped early, so capacity isn't established.
+
+| Code | Users | Plan, median and p95 | Heatmap, median and p95 | Search, median and p95 | Failed |
+| --- | --- | --- | --- | --- | --- |
+| Before the speedups | 10 | 4.7 s, 11.1 s | 2.6 s, 4.3 s | 0.31 s, 0.56 s | 0 of 360 |
+| Before the speedups | 25 | 9.9 s, 20.4 s | 7.0 s, 11.8 s | 2.5 s, 6.6 s | 0 of 207 |
+
+The 25-user stage passed its limit of 5 seconds for searches at p95, and k6 stopped it early. Django handled those searches in under 0.5 s, so the wait was queueing for CPU, with the backend using about one full core.
+
+Provider quota runs out long before this. The first two stages asked for about 65,000 forecast locations in 8 minutes, while Open-Meteo's free tier allows 10,000 a day.
+
+**Not measured:** the speedups at the same load, more than 25 users, Redis and more workers, `HEAVY_REQUEST_LIMIT` being reached, the `overlap` and `long` scenarios, provider slowdowns and outages under load, spikes, and long runs.

@@ -234,3 +234,10 @@ def test_a_base_url_replaces_the_real_host(respx_mock: respx.MockRouter) -> None
     with pytest.raises(ProviderUnavailable):
         provider.hourly([DENVER])
     assert route.called
+
+
+def test_the_forecast_length_can_be_chosen(respx_mock: respx.MockRouter) -> None:
+    call = respx_mock.get(FREE_URL).mock(httpx.Response(500))
+    with pytest.raises(ProviderUnavailable):
+        OpenMeteoProvider(retry_delay_seconds=0).hourly([DENVER], forecast_days=7)
+    assert call.calls[0].request.url.params["forecast_days"] == "7"

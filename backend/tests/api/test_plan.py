@@ -274,11 +274,11 @@ def test_partial_weather_outage_returns_200_with_warning(
     original = weather.hourly
     state = {"calls": 0}
 
-    def second_batch_fails(cells: Any) -> Any:
+    def second_batch_fails(cells: Any, forecast_days: int = 16) -> Any:
         state["calls"] += 1
         if state["calls"] == 2:
             raise ProviderUnavailable("down")
-        return original(cells)
+        return original(cells, forecast_days)
 
     weather.hourly = second_batch_fails  # type: ignore[method-assign]
     install(routing=FakeRouting([straight_route(1500, 90_000)]), weather=weather)

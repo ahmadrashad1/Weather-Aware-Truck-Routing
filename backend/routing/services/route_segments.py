@@ -37,16 +37,25 @@ def simplify_indices(geometry: Sequence[LatLon], tolerance_degrees: float) -> li
     return sorted(keep)
 
 
-def simplify(geometry: Sequence[LatLon]) -> tuple[LatLon, ...]:
-    return tuple(geometry[i] for i in simplify_indices(geometry, DISPLAY_TOLERANCE_DEGREES))
+def display_indices(geometry: Sequence[LatLon]) -> list[int]:
+    return simplify_indices(geometry, DISPLAY_TOLERANCE_DEGREES)
 
 
 def build_segments(
-    geometry: Sequence[LatLon], total_miles: float, checkpoints: Sequence[AssessedCheckpoint]
+    geometry: Sequence[LatLon],
+    total_miles: float,
+    checkpoints: Sequence[AssessedCheckpoint],
+    cumulative: Sequence[float] | None = None,
+    kept: Sequence[int] | None = None,
 ) -> list[RouteSegment]:
-    """Draw the route in stretches of equal risk, merging adjacent checkpoints that agree."""
-    cumulative = scaled_cumulative_miles(geometry, total_miles)
-    kept = simplify_indices(geometry, DISPLAY_TOLERANCE_DEGREES)
+    """Draw the route in stretches of equal risk, merging adjacent checkpoints that agree.
+
+    `cumulative` and `kept` save repeating work on a long route if the caller already has them.
+    """
+    if cumulative is None:
+        cumulative = scaled_cumulative_miles(geometry, total_miles)
+    if kept is None:
+        kept = display_indices(geometry)
     kept_miles = [cumulative[i] for i in kept]
 
     segments = []

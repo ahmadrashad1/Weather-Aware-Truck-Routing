@@ -19,7 +19,10 @@ class Checkpoint:
 
 
 def generate_checkpoints(
-    geometry: Sequence[LatLon], total_miles: float, interval_miles: int
+    geometry: Sequence[LatLon],
+    total_miles: float,
+    interval_miles: int,
+    cumulative: Sequence[float] | None = None,
 ) -> list[Checkpoint]:
     """Place checkpoints at the origin, every interval, and the destination.
 
@@ -34,7 +37,8 @@ def generate_checkpoints(
     if len(geometry) < 2:
         raise ValueError("Route geometry needs at least two points")
 
-    cumulative = scaled_cumulative_miles(geometry, total_miles)
+    if cumulative is None:
+        cumulative = scaled_cumulative_miles(geometry, total_miles)
     marks = _checkpoint_miles(total_miles, interval_miles)
     boundaries = [0.0, *((a + b) / 2 for a, b in pairwise(marks)), total_miles]
     return [

@@ -21,8 +21,8 @@ class Heatmap:
 def build_heatmap(
     points: Sequence[LatLon], departure: datetime, load_lb: float, weather: WeatherSource
 ) -> Heatmap:
-    forecasts = weather.forecasts(points)
     start = departure.astimezone(UTC)
+    forecasts = weather.forecasts(points, needed_until=start + timedelta(hours=HEATMAP_FRAMES - 1))
     frames = [start + timedelta(hours=hour) for hour in range(HEATMAP_FRAMES)]
 
     risk = []

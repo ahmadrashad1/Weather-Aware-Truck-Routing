@@ -38,7 +38,9 @@ class FakeWeather:
         self.failures = list(failures)
         self.requests: list[list[LatLon]] = []
 
-    def hourly(self, cells: Sequence[LatLon]) -> dict[LatLon, HourlyForecast]:
+    def hourly(
+        self, cells: Sequence[LatLon], forecast_days: int = 16
+    ) -> dict[LatLon, HourlyForecast]:
         self.requests.append(list(cells))
         failure = self.failures.pop(0) if self.failures else None
         if failure:
@@ -293,7 +295,9 @@ class SlowWeather(FakeWeather):
         self.clock = clock
         self.seconds = seconds
 
-    def hourly(self, cells: Sequence[LatLon]) -> dict[LatLon, HourlyForecast]:
+    def hourly(
+        self, cells: Sequence[LatLon], forecast_days: int = 16
+    ) -> dict[LatLon, HourlyForecast]:
         self.clock.now += self.seconds
         return super().hourly(cells)
 
@@ -401,3 +405,96 @@ def test_only_fetched_locations_stay_charged_after_a_partial_failure() -> None:
     with pytest.raises(WeatherBudgetExceeded):
         scoped.forecasts([(50.0 + index * 0.1, -90.0) for index in range(51)])
     assert len(scoped.forecasts([(50.0 + index * 0.1, -90.0) for index in range(50)])) == 50
+
+
+NOW = datetime(2026, 11, 2, 15, 30, tzinfo=UTC)
+
+
+class WindowWeather(FakeWeather):
+    """Records how many days each request asked for."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.days: list[int] = []
+
+    def hourly(
+        self, cells: Sequence[LatLon], forecast_days: int = 16
+    ) -> dict[LatLon, HourlyForecast]:
+        self.days.append(forecast_days)
+        return super().hourly(cells)
+
+
+def windowed(weather: WindowWeather, when: datetime = NOW) -> WeatherLookup:
+    return WeatherLookup(weather, today=lambda: when)
+
+
+def test_a_near_trip_fetches_the_short_forecast() -> None:
+    weather = WindowWeather()
+    windowed(weather).forecasts(grid(1), needed_until=NOW + timedelta(days=3))
+    assert weather.days == [7]
+
+
+def test_a_far_trip_fetches_the_full_forecast() -> None:
+    weather = WindowWeather()
+    windowed(weather).forecasts(grid(1), needed_until=NOW + timedelta(days=10))
+    assert weather.days == [16]
+
+
+def test_no_stated_need_fetches_the_full_forecast() -> None:
+    weather = WindowWeather()
+    windowed(weather).forecasts(grid(1))
+    assert weather.days == [16]
+
+
+@pytest.mark.parametrize(
+    ("needed_until", "days"),
+    [
+        # Seven days from midnight runs to 23:00 on the sixth day after, and precipitation reads
+        # the next whole hour, so 22:00 is the last moment the short forecast can answer.
+        (datetime(2026, 11, 8, 22, 0, tzinfo=UTC), 7),
+        (datetime(2026, 11, 8, 22, 0, 1, tzinfo=UTC), 16),
+        (datetime(2026, 11, 8, 23, 0, tzinfo=UTC), 16),
+    ],
+)
+def test_the_short_forecast_is_only_used_where_it_can_answer(
+    needed_until: datetime, days: int
+) -> None:
+    weather = WindowWeather()
+    windowed(weather).forecasts(grid(1), needed_until=needed_until)
+    assert weather.days == [days]
+
+
+def test_a_cached_full_forecast_serves_a_near_trip() -> None:
+    weather = WindowWeather()
+    lookup = windowed(weather)
+    lookup.forecasts(grid(1))
+    lookup.forecasts(grid(1), needed_until=NOW + timedelta(days=1))
+    assert weather.days == [16]
+
+
+def test_a_cached_short_forecast_does_not_serve_a_far_trip() -> None:
+    weather = WindowWeather()
+    lookup = windowed(weather)
+    lookup.forecasts(grid(1), needed_until=NOW + timedelta(days=1))
+    lookup.forecasts(grid(1), needed_until=NOW + timedelta(days=10))
+    assert weather.days == [7, 16]
+
+
+def test_a_short_forecast_from_yesterday_is_not_reused_at_midnight() -> None:
+    # It would end a day too soon, and a trip it can't cover would show as unknown.
+    weather = WindowWeather()
+    windowed(weather, datetime(2026, 11, 2, 23, 50, tzinfo=UTC)).forecasts(
+        grid(1), needed_until=datetime(2026, 11, 3, 1, tzinfo=UTC)
+    )
+    windowed(weather, datetime(2026, 11, 3, 0, 10, tzinfo=UTC)).forecasts(
+        grid(1), needed_until=datetime(2026, 11, 9, 22, tzinfo=UTC)
+    )
+    assert weather.days == [7, 7]
+
+
+def test_a_scoped_lookup_passes_on_how_far_ahead_it_needs() -> None:
+    weather = WindowWeather()
+    windowed(weather).for_request("client", Purpose.CHECKPOINTS).forecasts(
+        grid(1), needed_until=NOW + timedelta(hours=48)
+    )
+    assert weather.days == [7]

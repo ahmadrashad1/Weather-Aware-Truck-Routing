@@ -1,7 +1,9 @@
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from routing.providers.base import HourlyForecast
 from routing.providers.errors import ProviderUnavailable
 from routing.services.geometry import LatLon
 from routing.services.heatmap import HEATMAP_FRAMES, build_heatmap
@@ -77,7 +79,7 @@ def test_point_whose_batch_failed_is_all_null() -> None:
     weather = FakeWeather(START)
     original = weather.hourly
 
-    def only_first_cell(cells: list[LatLon]) -> dict:  # type: ignore[type-arg]
+    def only_first_cell(cells: list[LatLon], forecast_days: int = 16) -> dict:  # type: ignore[type-arg]
         return {cell: forecast for cell, forecast in original(cells).items() if cell == POINT}
 
     weather.hourly = only_first_cell  # type: ignore[method-assign,assignment]
@@ -90,3 +92,17 @@ def test_total_outage_raises() -> None:
     weather = FakeWeather(START, error=ProviderUnavailable("down"))
     with pytest.raises(ProviderUnavailable):
         build_heatmap([POINT], START, 1000, lookup(weather))
+
+
+def test_the_forecast_requested_covers_the_last_slider_hour() -> None:
+    class Recording:
+        needed: datetime | None = None
+
+        def forecasts(
+            self, positions: Sequence[LatLon], needed_until: datetime | None = None
+        ) -> dict[LatLon, HourlyForecast | None]:
+            Recording.needed = needed_until
+            return dict.fromkeys(positions)
+
+    build_heatmap([POINT], START, 1000, Recording())
+    assert Recording.needed == START + timedelta(hours=48)

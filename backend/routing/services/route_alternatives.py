@@ -34,10 +34,11 @@ def get_three_routes(
     already found, because real routes with a warning are more useful than an error.
     """
     routes: list[ProviderRoute] = []
+    tracks: list[_Track] = []
     for candidate in provider.routes(
         origin, destination, departure, load_lb, max_alternatives=TARGET_ROUTES - 1
     ):
-        _keep_if_distinct(candidate, routes)
+        _keep_if_distinct(candidate, routes, tracks)
     del routes[TARGET_ROUTES:]
 
     for via in _via_points(routes[0], origin, destination):
@@ -47,7 +48,7 @@ def get_three_routes(
             for candidate in provider.routes(
                 origin, destination, departure, load_lb, via=via, max_alternatives=0
             ):
-                _keep_if_distinct(candidate, routes)
+                _keep_if_distinct(candidate, routes, tracks)
         except NoRouteFound:
             continue
         except (ProviderUnavailable, ProviderRateLimited):
@@ -63,23 +64,33 @@ def get_three_routes(
 
 def overlap_fraction(route: Sequence[LatLon], other: Sequence[LatLon]) -> float:
     """Return the share of `route`, by distance, that runs along `other`."""
-    other_cells = {_cell(point) for point in sample_along(other, OVERLAP_SAMPLE_MILES)}
-    samples = sample_along(route, OVERLAP_SAMPLE_MILES)
-    shared = sum(1 for point in samples if _near_cells(_cell(point)) & other_cells)
-    return shared / len(samples)
+    return _Track(route).overlap_with(_Track(other))
 
 
-def _keep_if_distinct(candidate: ProviderRoute, routes: list[ProviderRoute]) -> None:
-    if not any(_is_duplicate(candidate, kept) for kept in routes):
+class _Track:
+    """A route's samples and map cells, kept because each is compared with several others."""
+
+    def __init__(self, geometry: Sequence[LatLon]) -> None:
+        self.cells = [_cell(point) for point in sample_along(geometry, OVERLAP_SAMPLE_MILES)]
+        self.cell_set = set(self.cells)
+
+    def overlap_with(self, other: "_Track") -> float:
+        shared = sum(1 for cell in self.cells if _is_near(cell, other.cell_set))
+        return shared / len(self.cells)
+
+
+def _keep_if_distinct(
+    candidate: ProviderRoute, routes: list[ProviderRoute], tracks: list[_Track]
+) -> None:
+    track = _Track(candidate.geometry)
+    if not any(_is_duplicate(track, kept) for kept in tracks):
         routes.append(candidate)
+        tracks.append(track)
 
 
-def _is_duplicate(a: ProviderRoute, b: ProviderRoute) -> bool:
+def _is_duplicate(a: _Track, b: _Track) -> bool:
     # Both directions, so a short route is not a duplicate of a long detour that contains it.
-    return (
-        overlap_fraction(a.geometry, b.geometry) > DUPLICATE_OVERLAP
-        and overlap_fraction(b.geometry, a.geometry) > DUPLICATE_OVERLAP
-    )
+    return a.overlap_with(b) > DUPLICATE_OVERLAP and b.overlap_with(a) > DUPLICATE_OVERLAP
 
 
 def _cell(point: LatLon) -> tuple[int, int]:
@@ -89,8 +100,13 @@ def _cell(point: LatLon) -> tuple[int, int]:
     )
 
 
-def _near_cells(cell: tuple[int, int]) -> set[tuple[int, int]]:
-    return {(cell[0] + lat, cell[1] + lon) for lat in (-1, 0, 1) for lon in (-1, 0, 1)}
+def _is_near(cell: tuple[int, int], cells: set[tuple[int, int]]) -> bool:
+    lat, lon = cell
+    return any(
+        (lat + lat_step, lon + lon_step) in cells
+        for lat_step in (-1, 0, 1)
+        for lon_step in (-1, 0, 1)
+    )
 
 
 def _via_points(primary: ProviderRoute, origin: LatLon, destination: LatLon) -> list[LatLon]:
