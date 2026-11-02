@@ -31,7 +31,7 @@ An independent review of the whole project found and fixed five issues, recorded
 | --- | --- |
 | All routes on a map | `src/features/map/buildGeoJson.test.ts`, `MapPanel.test.tsx`, `e2e/trip.spec.ts` using real rendered pixels. Live. |
 | Checkpoints, risk levels and ETAs | `MapPanel.test.tsx`, `e2e/trip.spec.ts` including real canvas clicks. Live. |
-| Route summaries | `src/features/trip/RouteList.test.tsx`, `e2e/trip.spec.ts`. Live. |
+| Route summaries | On the map's route labels and in the route cards. `src/features/map/MapPanel.test.tsx`, `src/features/trip/RouteList.test.tsx`, `e2e/trip.spec.ts`. Live. |
 | Corridor heatmap | `services/test_corridor_grid.py`, `services/test_heatmap.py`, `api/test_heatmap_api.py`. Live. |
 | 0–48 hour slider | `src/features/forecast/ForecastSlider.test.tsx`, `HeatmapLayer.test.tsx`, `e2e/heatmap.spec.ts`. Live. |
 | Heatmap colours show real risk | `e2e/heatmap.spec.ts`, comparing what the map itself draws, with overlays hidden. Live: real forecast risk shows along a long trip. |
