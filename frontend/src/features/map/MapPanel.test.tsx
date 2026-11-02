@@ -12,6 +12,7 @@ import {
 } from '@/test/fixtures/plan'
 
 import { forecastStore } from '@/features/forecast/forecastStore'
+import { formatDuration, formatMiles } from '@/lib/format'
 
 import MapPanel from './MapPanel'
 
@@ -333,6 +334,39 @@ describe('MapPanel', () => {
     })
   })
 
+  it('shows every route summary on the map, and more for the selected route', () => {
+    setup({ selectedRouteId: plan.routes[0].id })
+    const selected = screen.getByRole('button', { name: /Select route 1/ })
+    const summary = plan.routes[0].summary
+    expect(selected).toHaveTextContent(formatMiles(summary.distance_miles))
+    expect(selected).toHaveTextContent(formatDuration(summary.duration_seconds))
+    expect(selected).toHaveTextContent(
+      `Severe ${formatMiles(summary.severe_miles)}`,
+    )
+    expect(selected).toHaveTextContent(
+      `High ${formatMiles(summary.high_miles)}`,
+    )
+    expect(selected).toHaveTextContent(`Average risk ${summary.average_risk}`)
+
+    const other = screen.getByRole('button', { name: /Select route 2/ })
+    const otherSummary = plan.routes[1].summary
+    expect(other).toHaveTextContent(formatMiles(otherSummary.distance_miles))
+    expect(other).toHaveTextContent(
+      formatDuration(otherSummary.duration_seconds),
+    )
+    expect(other).not.toHaveTextContent('Average risk')
+  })
+
+  it('names a route summary for screen readers too', () => {
+    setup()
+    const summary = plan.routes[0].summary
+    expect(
+      screen.getByRole('button', {
+        name: new RegExp(formatMiles(summary.distance_miles)),
+      }),
+    ).toBeInTheDocument()
+  })
+
   it('makes checkpoints and route lines clickable', () => {
     setup()
     expect(fake.mapProps.interactiveLayerIds).toEqual([
@@ -453,7 +487,9 @@ describe('MapPanel', () => {
     const user = userEvent.setup()
     const { props } = setup()
     await user.click(
-      screen.getByRole('button', { name: `Select route ${secondRoute.rank}` }),
+      screen.getByRole('button', {
+        name: new RegExp(`^Select route ${secondRoute.rank}:`),
+      }),
     )
     expect(props.onSelectRoute).toHaveBeenCalledWith(secondRoute.id)
   })

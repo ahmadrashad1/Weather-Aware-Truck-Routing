@@ -17,6 +17,7 @@ import {
 } from 'react-map-gl/maplibre'
 
 import type { HeatmapResponse, PlanResponse } from '@/api/client'
+import { formatDuration, formatMiles } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import {
@@ -236,26 +237,55 @@ function MapPanel({
         ) : null}
         {labels.map(({ route, lon, lat }) => {
           const isRecommended = route.id === plan?.recommended_route_id
+          const isSelected = route.id === selectedRouteId
+          const { summary } = route
+          const distanceAndTime = `${formatMiles(summary.distance_miles)}, ${formatDuration(summary.duration_seconds)}`
           return (
             <Marker
               key={route.id}
               longitude={lon}
               latitude={lat}
               anchor="bottom"
+              style={{ zIndex: isSelected ? 1 : 0 }}
             >
               <button
                 type="button"
-                aria-label={`Select route ${route.rank}`}
+                aria-label={`Select route ${route.rank}: ${distanceAndTime}`}
                 onClick={() => onSelectRoute(route.id)}
                 className={cn(
-                  'pressable rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap shadow-sm focus-visible:outline-3 focus-visible:outline-action',
+                  'pressable rounded-xl px-2.5 py-1 text-left text-xs whitespace-nowrap shadow-sm focus-visible:outline-3 focus-visible:outline-action',
                   isRecommended
                     ? 'bg-action text-white'
                     : 'bg-white text-asphalt',
-                  route.id === selectedRouteId && 'ring-2 ring-asphalt',
+                  isSelected && 'ring-2 ring-asphalt',
                 )}
               >
-                Route {route.rank}
+                <span className="block font-semibold">Route {route.rank}</span>
+                <span className="block tabular-nums">{distanceAndTime}</span>
+                {isSelected ? (
+                  // On a phone these numbers are right below, in the sheet, and the map has less room.
+                  <span className="hidden tabular-nums lg:block">
+                    Severe {formatMiles(summary.severe_miles)}, High{' '}
+                    {formatMiles(summary.high_miles)}
+                    <br />
+                    Average risk{' '}
+                    {summary.average_risk === null
+                      ? 'unavailable'
+                      : summary.average_risk}
+                    {summary.no_travel_miles > 0 ? (
+                      <>
+                        <br />
+                        No Travel {formatMiles(summary.no_travel_miles)}
+                      </>
+                    ) : null}
+                    {summary.unknown_miles > 0 ? (
+                      <>
+                        <br />
+                        No weather {formatMiles(summary.unknown_miles)}
+                      </>
+                    ) : null}
+                  </span>
+                ) : null}
               </button>
             </Marker>
           )

@@ -125,6 +125,7 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - Only the sheet's header drags it, and its content always scrolls — dragging content as well needs gesture disambiguation that's easy to get wrong — cost if wrong: it differs slightly from Apple Maps, where content drags the sheet too.
 - Phones hide the map's zoom buttons and the forecast panel's explanation — pinching zooms, and space above the sheet is tight — cost if wrong: the explanation is only on wide screens.
 - The hint under the map only shows on wide screens — requested, because on a phone the form is right below the map — cost if wrong: none.
+- Route labels on the map show distance and time, and the selected route also shows its risk summary — the assessment asks for summaries on the map, and the fuller version on all three would cover the routes — cost if wrong: unselected routes need a tap for their risk numbers.
 
 ## Known minor issues, left as they are
 
