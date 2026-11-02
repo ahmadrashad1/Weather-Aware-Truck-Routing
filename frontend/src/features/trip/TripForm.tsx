@@ -148,7 +148,7 @@ export function TripForm({ onSubmit, isPending, error }: TripFormProps) {
           {INTERVALS.map((value) => (
             <label
               key={value}
-              className="relative cursor-pointer rounded-[0.625rem] py-2 text-center text-sm font-medium has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-action"
+              className="relative flex min-h-11 cursor-pointer items-center justify-center rounded-[0.625rem] text-sm font-medium lg:min-h-9 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-action"
             >
               <input
                 type="radio"

@@ -67,9 +67,13 @@ export function Hero() {
 
   return (
     <>
-      {/* The hero is sticky, so the browser thinks it's always in view and won't scroll to it. */}
-      <span id="top" aria-hidden className="absolute top-0" />
-      <header className="sticky top-0 isolate flex h-dvh snap-start flex-col overflow-hidden bg-black text-white">
+      {/* The hero is sticky, so the browser thinks it's always in view. Scroll and snap to this. */}
+      <span
+        id="top"
+        aria-hidden
+        className="absolute top-0 h-dvh w-px max-lg:snap-start"
+      />
+      <header className="sticky top-0 isolate flex h-dvh flex-col overflow-hidden bg-black text-white">
         <div
           ref={mediaRef}
           data-layer="media"

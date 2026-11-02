@@ -119,7 +119,9 @@ function clickFeatures(features: unknown[]) {
 
 function loadMap() {
   act(() => {
-    ;(fake.mapProps.onLoad as unknown as () => void)()
+    ;(fake.mapProps.onLoad as unknown as (event: unknown) => void)({
+      target: { getContainer: () => document.createElement('div') },
+    })
   })
 }
 
@@ -233,6 +235,11 @@ describe('MapPanel', () => {
     expect(padding.left).toBeGreaterThan(padding.right)
   })
 
+  it('leaves the wheel to the page while the map is still loading', () => {
+    setup()
+    expect(fake.mapProps.scrollZoom).toBe(false)
+  })
+
   it('lets the wheel scroll the page until the map is fully in view', () => {
     let report: (entries: { intersectionRatio: number }[]) => void = () => {}
     vi.stubGlobal(
@@ -257,14 +264,18 @@ describe('MapPanel', () => {
     expect(fake.scrollZoom.disable).toHaveBeenCalled()
   })
 
-  it('uses even padding on a phone, where the panel sits below the map', () => {
+  it('on a phone, fits the trip into the space above the half-open sheet', () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn(() => ({ matches: false })),
     )
+    vi.stubGlobal('innerHeight', 800)
     setup()
     loadMap()
-    expect(fake.fitBounds.mock.calls[0][1].padding).toBe(60)
+    const { padding } = fake.fitBounds.mock.calls[0][1]
+    expect(padding.left).toBe(padding.right)
+    expect(padding.bottom).toBeGreaterThan(800 * 0.4)
+    expect(padding.top).toBeGreaterThan(100)
   })
 
   it('moving the forecast hour does not re-render the map panel', () => {
@@ -420,19 +431,22 @@ describe('MapPanel', () => {
     expect(fake.easeTo).not.toHaveBeenCalled()
   })
 
-  it('on a phone, moves a selected checkpoint low so its whole popup fits', () => {
+  it('on a phone, moves a selected checkpoint low so its popup clears the forecast', () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn(() => ({ matches: false })),
     )
-    const { rerender, props } = setup()
+    setup({ selectedCheckpointId: plan.routes[0].checkpoints[0].id })
     loadMap()
-    rerender(<MapPanel {...props} selectedCheckpointId={severeCheckpoint.id} />)
-    expect(fake.easeTo).toHaveBeenCalledTimes(1)
-    expect(fake.easeTo.mock.calls[0][0]).toMatchObject({
-      center: [severeCheckpoint.lon, severeCheckpoint.lat],
-      offset: [0, 105],
-    })
+    expect(fake.easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [
+          plan.routes[0].checkpoints[0].lon,
+          plan.routes[0].checkpoints[0].lat,
+        ],
+        offset: [0, 60],
+      }),
+    )
   })
 
   it('labels each route and selects it from the label', async () => {

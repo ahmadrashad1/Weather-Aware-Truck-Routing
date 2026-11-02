@@ -122,10 +122,26 @@
   }
 }
 
-/* The map needs to land exactly in view, and a phone's page is too long to snap. */
+/* The map needs to land exactly in view. Both pages are one screen tall, so a phone always snaps. */
+html {
+  scroll-snap-type: y mandatory;
+}
+
 @media (min-width: 1024px) {
   html {
     scroll-snap-type: y proximity;
+  }
+}
+
+/* A phone pinches to zoom, and the sheet covers the map's bottom corners. */
+@media (max-width: 1023px) {
+  .maplibregl-map .maplibregl-ctrl-top-right {
+    display: none;
+  }
+
+  .maplibregl-map .maplibregl-ctrl-bottom-right {
+    top: 10rem;
+    bottom: auto;
   }
 }
 
