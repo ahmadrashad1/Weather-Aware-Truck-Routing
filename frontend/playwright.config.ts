@@ -6,7 +6,9 @@ const isLive = Boolean(process.env.PLAYWRIGHT_LIVE)
 export default defineConfig({
   testDir: './e2e',
   // The live check spends real provider quota, so it only runs when asked for.
-  testMatch: isLive ? /live\.spec\.ts/ : /(trip|heatmap|errors|hero)\.spec\.ts/,
+  testMatch: isLive
+    ? /live\.spec\.ts/
+    : /(trip|heatmap|errors|hero|mobile)\.spec\.ts/,
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
@@ -35,10 +37,13 @@ export default defineConfig({
     },
     {
       name: 'mobile',
-      testMatch: isLive ? /^$/ : /(trip|hero)\.spec\.ts/,
+      testMatch: isLive ? /^$/ : /(trip|hero|mobile)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
-        viewport: { width: 390, height: 844 },
+        // A real phone's touch input, and its smaller space under the browser's own bars.
+        viewport: { width: 390, height: 664 },
+        hasTouch: true,
+        isMobile: true,
       },
     },
   ],

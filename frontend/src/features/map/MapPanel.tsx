@@ -30,6 +30,7 @@ import { CheckpointPopup } from './CheckpointPopup'
 import { HeatmapLayer } from './HeatmapLayer'
 import { Legend } from './Legend'
 import { RouteLayers } from './RouteLayers'
+import { HALF_TOP_SHARE } from '@/features/sheet/sheetPhysics'
 
 // MapLibre looks for its worker beside its own script, where the bundler doesn't put it.
 setWorkerUrl(workerUrl)
@@ -54,11 +55,14 @@ const ATTRIBUTION = {
   customAttribution:
     '<a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather data by Open-Meteo.com</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>)',
 }
-const FIT_PADDING = 60
+// Room for the legend and forecast above, and the half-open sheet below.
+const PHONE_POPUP_OFFSET_SHARE = 0.2
+const PHONE_FIT_SIDE = 40
+const PHONE_FIT_TOP = 175
+const PHONE_FIT_ABOVE_SHEET = 24
 // Room for the planner and forecast panels, which float over the map on a wide screen.
 const WIDE_SCREEN_FIT_PADDING = { top: 70, left: 480, right: 60, bottom: 190 }
 const FIT_MAX_ZOOM = 11
-const PHONE_POPUP_OFFSET_SHARE = 0.35
 const ANIMATION_MS = 700
 const FULLY_IN_VIEW = 0.95
 const INTERACTIVE_LAYERS = [CHECKPOINT_LAYER, ROUTE_HIT_LAYER]
@@ -78,7 +82,15 @@ function isNarrowScreen(): boolean {
 }
 
 function fitPadding() {
-  return isNarrowScreen() ? FIT_PADDING : WIDE_SCREEN_FIT_PADDING
+  if (!isNarrowScreen()) return WIDE_SCREEN_FIT_PADDING
+  return {
+    top: PHONE_FIT_TOP,
+    left: PHONE_FIT_SIDE,
+    right: PHONE_FIT_SIDE,
+    bottom:
+      Math.round(window.innerHeight * (1 - HALF_TOP_SHARE)) +
+      PHONE_FIT_ABOVE_SHEET,
+  }
 }
 
 function layerOf(feature: MapGeoJSONFeature, layerId: string): boolean {
@@ -135,7 +147,8 @@ function MapPanel({
       selectedCheckpoint.lat,
     ]
     if (isNarrowScreen()) {
-      // The map is short on a phone, so put the point low enough for its popup to fit above it.
+      // The sheet lowers for a selection, so put the point low enough for its popup to clear the
+      // forecast panel above it.
       const offset: [number, number] = [
         0,
         map.getContainer().clientHeight * PHONE_POPUP_OFFSET_SHARE,
@@ -184,8 +197,19 @@ function MapPanel({
         mapStyle={baseMapFailed ? BLANK_MAP_STYLE : BASE_MAP_STYLE}
         style={MAP_STYLE}
         attributionControl={ATTRIBUTION}
+        // Off from the start, or a map that's still loading would capture the page's scroll.
+        scrollZoom={false}
         interactiveLayerIds={plan ? INTERACTIVE_LAYERS : []}
-        onLoad={() => setIsLoaded(true)}
+        onLoad={(event) => {
+          setIsLoaded(true)
+          // The credit starts open, and on a phone that would cover much of the map.
+          if (isNarrowScreen()) {
+            event.target
+              .getContainer()
+              .querySelector('.maplibregl-ctrl-attrib')
+              ?.classList.remove('maplibregl-compact-show')
+          }
+        }}
         onError={(event) => {
           // A failed tile only leaves a gap. With no style, nothing can be drawn at all.
           if (!event.target.getStyle()?.layers?.length) setBaseMapFailed(true)
@@ -254,7 +278,7 @@ function MapPanel({
       {baseMapFailed ? (
         <p
           role="status"
-          className="material absolute bottom-3 left-3 z-10 rounded-2xl px-3 py-1.5 text-xs lg:left-[27.5rem]"
+          className="material absolute top-14 left-3 z-10 rounded-2xl px-3 py-1.5 text-xs lg:top-auto lg:bottom-3 lg:left-[27.5rem]"
         >
           The background map could not load. Routes and checkpoints still show.
         </p>

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { stubApi } from './fixtures/app.ts'
+import { fillTrip, stubApi } from './fixtures/app.ts'
 
 // The config reduces motion for pixel comparisons, but these tests are about the motion.
 test.use({ contextOptions: { reducedMotion: 'no-preference' } })
@@ -38,7 +38,9 @@ test('scrolling moves the film and the words at different speeds', async ({
   page,
 }) => {
   const layer = (name: string) => page.locator(`[data-layer="${name}"]`)
-  await page.evaluate(() => window.scrollTo({ top: 300, behavior: 'instant' }))
+  await page.evaluate(() =>
+    window.scrollTo({ top: innerHeight * 0.6, behavior: 'instant' }),
+  )
   await expect
     .poll(() => layer('copy').evaluate((el) => el.style.transform))
     .toContain('translate3d(0px, -')
@@ -55,6 +57,8 @@ test('the wheel over the map scrolls the page until the map is in view', async (
   await page.evaluate(() => window.scrollTo({ top: 200, behavior: 'instant' }))
   await page.mouse.move(900, 700)
   const before = await page.evaluate(() => window.scrollY)
+  // Snapping must not pull the page back to the top, or the first wheel notches feel stuck.
+  expect(before).toBeGreaterThan(0)
   await page.mouse.wheel(0, 120)
   await expect
     .poll(() => page.evaluate(() => window.scrollY))
@@ -92,4 +96,23 @@ test('only wide screens show the hint under the map', async ({
   await page.getByRole('link', { name: 'Plan a trip' }).click()
   if (info.project.name === 'mobile') await expect(hint).toBeHidden()
   else await expect(hint).toBeVisible()
+})
+
+test('once the map is in view, the wheel zooms it again', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name === 'mobile', 'Phones have no wheel')
+  await page.getByRole('link', { name: 'Plan a trip' }).click()
+  await fillTrip(page)
+  await page.getByRole('button', { name: 'Plan routes' }).click()
+  await page.getByRole('slider', { name: 'Forecast hour' }).waitFor()
+  await page.waitForTimeout(1500)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  const before = await canvas.screenshot()
+  const scrolled = await page.evaluate(() => window.scrollY)
+  await page.mouse.move(800, 300)
+  await page.mouse.wheel(0, -600)
+  await page.waitForTimeout(1500)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+  expect(Buffer.compare(before, await canvas.screenshot())).not.toBe(0)
 })

@@ -121,6 +121,9 @@ Choices the assessment and plan left open, recorded as they were made, with thei
 - The system font replaces Overpass, and blue replaces the highway-sign green as the action colour — Apple's guidance is to use the platform font, and blue stays clear of the risk colours on the map — cost if wrong: the app looks a little less distinctive, and differs slightly by device.
 - The map's wheel zoom stays off until it's at least 95% in view — otherwise a map rising under the pointer captures the scroll partway up the screen — cost if wrong: a slightly short map can't zoom by wheel until it's scrolled into place.
 - Alert emails go through Resend from a GitHub workflow — requested, and Lightsail alarms can't call Resend directly — cost if wrong: alerts can lag by the 15-minute check plus any GitHub delay, and stop if GitHub pauses the schedule.
+- On phones the map is full screen, with a draggable bottom sheet that stops at three heights — a stuck map and panel took over half the screen and hid the results — cost if wrong: about 200 lines of gesture code to maintain, with no library.
+- Only the sheet's header drags it, and its content always scrolls — dragging content as well needs gesture disambiguation that's easy to get wrong — cost if wrong: it differs slightly from Apple Maps, where content drags the sheet too.
+- Phones hide the map's zoom buttons and the forecast panel's explanation — pinching zooms, and space above the sheet is tight — cost if wrong: the explanation is only on wide screens.
 - The hint under the map only shows on wide screens — requested, because on a phone the form is right below the map — cost if wrong: none.
 
 ## Known minor issues, left as they are

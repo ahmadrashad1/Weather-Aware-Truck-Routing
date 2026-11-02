@@ -8,10 +8,10 @@ import { forecastStore, useForecastHour } from './forecastStore'
 
 const LAST_HOUR = 48
 const MS_PER_HOUR = 60 * 60 * 1000
-// Below the map on a phone, where floating over it would hide most of the route. Floating on a
-// wide screen, where the map leaves room for it when fitting a trip.
+// Floats over the top of the map on a phone, above the sheet, and low on a wide map, where the
+// map leaves room for it when fitting a trip.
 const PANEL_CLASS =
-  'z-20 bg-white px-4 py-2.5 text-sm lg:material lg:absolute lg:right-4 lg:bottom-9 lg:left-[27.5rem] lg:mx-auto lg:max-w-xl lg:rounded-2xl'
+  'material absolute inset-x-3 top-14 z-10 rounded-2xl px-3.5 py-2 text-sm lg:top-auto lg:right-4 lg:bottom-9 lg:left-[27.5rem] lg:mx-auto lg:max-w-xl lg:px-4 lg:py-2.5'
 
 function hourLabel(departureAt: string, hour: number, timeZone?: string) {
   const at = new Date(Date.parse(departureAt) + hour * MS_PER_HOUR)
@@ -99,10 +99,10 @@ function Slider({
         step={1}
         value={hour}
         aria-valuetext={label}
-        className="my-1 w-full accent-action"
+        className="h-8 w-full accent-action lg:my-1 lg:h-auto"
         onChange={(event) => forecastStore.set(Number(event.target.value))}
       />
-      <p className="text-xs text-asphalt/70">
+      <p className="hidden text-xs text-asphalt/70 lg:block">
         Shading shows risk for this load at the hour above. Route colours use
         each checkpoint&apos;s arrival time.
       </p>
